@@ -87,3 +87,60 @@ class Bancos(db.Model):
 
     def __repr__(self) -> str:
         return f"<Bancos {self.referencia}>"
+
+
+usuarios_permisos = db.Table(
+    "usuarios_permisos",
+    db.Column("usuario_id", db.Integer, db.ForeignKey("usuarios.id"), primary_key=True),
+    db.Column("permiso_id", db.Integer, db.ForeignKey("permisos.id"), primary_key=True),
+)
+
+
+class Usuario(db.Model):
+    __tablename__ = "usuarios"
+
+    id = db.Column(db.Integer, primary_key=True)
+    usuario = db.Column(db.String(100), unique=True, nullable=False, index=True)
+    contrasena = db.Column(db.String(255), nullable=False)
+    activo = db.Column(db.Boolean, default=True, nullable=False)
+    creado_en = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    actualizado_en = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    permisos = db.relationship(
+        "Permiso",
+        secondary=usuarios_permisos,
+        back_populates="usuarios",
+        lazy="dynamic",
+    )
+
+    def set_password(self, password: str) -> None:
+        self.contrasena = generate_password_hash(password)
+
+    def check_password(self, password: str) -> bool:
+        return check_password_hash(self.contrasena, password)
+
+    def __repr__(self) -> str:
+        return f"<Usuario {self.usuario}>"
+
+
+class Permiso(db.Model):
+    __tablename__ = "permisos"
+
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(100), unique=True, nullable=False)
+    creado_en = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    actualizado_en = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    usuarios = db.relationship(
+        "Usuario",
+        secondary=usuarios_permisos,
+        back_populates="permisos",
+        lazy="dynamic",
+    )
+
+    def __repr__(self) -> str:
+        return f"<Permiso {self.nombre}>"
