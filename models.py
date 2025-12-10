@@ -61,5 +61,29 @@ class Cliente(db.Model):
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
     )
 
+    pagos_banco = db.relationship("Bancos", back_populates="cliente", lazy="dynamic")
+
     def __repr__(self) -> str:
         return f"<Cliente {self.codigo}>"
+
+
+class Bancos(db.Model):
+    __tablename__ = "bancos"
+
+    id = db.Column(db.Integer, primary_key=True)
+    fecha = db.Column(db.Date, default=datetime.utcnow, nullable=False)
+    referencia = db.Column(db.String(100), nullable=False, index=True)
+    banco = db.Column(db.String(150), nullable=False)
+    monto = db.Column(Numeric(12, 2), nullable=False, default=0)
+    nota = db.Column(db.String(255))
+    asignado = db.Column(db.Boolean, default=False, nullable=False)
+    cliente_id = db.Column(db.Integer, db.ForeignKey("clientes.id"))
+    creado_en = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    actualizado_en = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    cliente = db.relationship("Cliente", back_populates="pagos_banco")
+
+    def __repr__(self) -> str:
+        return f"<Bancos {self.referencia}>"
