@@ -1,0 +1,24 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+.venv/
+venv/
+
+# Environment variables
+.env
+
+# Flask instance folder
+instance/
+
+# Database files (SQLite, etc.)
+*.db
+
+# Migrations (local only; keep server migrations separate)
+migrations/
+
+# OS / editor noise
+.DS_Store
+.idea/
+.vscode/

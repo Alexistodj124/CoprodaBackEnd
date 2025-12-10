@@ -1,10 +1,9 @@
 from flask import Flask, jsonify, request
-from config import Config
-from models import db, Producto, Cliente, Orden, OrdenItem, Usuario, CategoriaProducto, MarcaProducto, Tienda, Talla
-from flask_migrate import Migrate
-from datetime import datetime
 from flask_cors import CORS
-from datetime import datetime
+from flask_migrate import Migrate
+
+from config import Config
+from models import CategoriaProducto, Cliente, Producto, db
 
 
 
@@ -27,8 +26,9 @@ def create_app():
     def index():
         return jsonify({"message": "API funcionando"})
 
+    # ---------- CRUD PRODUCTOS ----------
 
-
+    
 
     return app
 
