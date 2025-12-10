@@ -61,6 +61,7 @@ class Cliente(db.Model):
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
     )
 
+    ordenes = db.relationship("Orden", back_populates="cliente", lazy="dynamic")
     pagos_banco = db.relationship("Bancos", back_populates="cliente", lazy="dynamic")
 
     def __repr__(self) -> str:
@@ -144,3 +145,79 @@ class Permiso(db.Model):
 
     def __repr__(self) -> str:
         return f"<Permiso {self.nombre}>"
+
+
+class TipoPago(db.Model):
+    __tablename__ = "tipos_pago"
+
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(100), unique=True, nullable=False)
+    creado_en = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    actualizado_en = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    ordenes = db.relationship("Orden", back_populates="tipo_pago", lazy="dynamic")
+
+    def __repr__(self) -> str:
+        return f"<TipoPago {self.nombre}>"
+
+
+class EstadoOrden(db.Model):
+    __tablename__ = "estados_orden"
+
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(100), unique=True, nullable=False)
+    creado_en = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    actualizado_en = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    ordenes = db.relationship("Orden", back_populates="estado", lazy="dynamic")
+
+    def __repr__(self) -> str:
+        return f"<EstadoOrden {self.nombre}>"
+
+
+class Orden(db.Model):
+    __tablename__ = "ordenes"
+
+    id = db.Column(db.Integer, primary_key=True)
+    fecha = db.Column(db.Date, default=datetime.utcnow, nullable=False)
+    tipo_pago_id = db.Column(db.Integer, db.ForeignKey("tipos_pago.id"), nullable=False)
+    estado_id = db.Column(
+        db.Integer, db.ForeignKey("estados_orden.id"), nullable=False
+    )
+    cliente_id = db.Column(db.Integer, db.ForeignKey("clientes.id"), nullable=False)
+    creado_en = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    actualizado_en = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    tipo_pago = db.relationship("TipoPago", back_populates="ordenes")
+    estado = db.relationship("EstadoOrden", back_populates="ordenes")
+    cliente = db.relationship("Cliente", back_populates="ordenes")
+    items = db.relationship("OrdenItem", back_populates="orden", lazy="dynamic")
+
+    def __repr__(self) -> str:
+        return f"<Orden {self.id}>"
+
+
+class OrdenItem(db.Model):
+    __tablename__ = "orden_items"
+
+    id = db.Column(db.Integer, primary_key=True)
+    orden_id = db.Column(db.Integer, db.ForeignKey("ordenes.id"), nullable=False)
+    producto_id = db.Column(db.Integer, db.ForeignKey("productos.id"), nullable=False)
+    precio = db.Column(Numeric(12, 2), nullable=False, default=0)
+    cantidad = db.Column(db.Integer, nullable=False, default=1)
+    creado_en = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    actualizado_en = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    orden = db.relationship("Orden", back_populates="items")
+    producto = db.relationship("Producto")
+
+    def __repr__(self) -> str:
+        return f"<OrdenItem {self.id} Orden {self.orden_id}>"
