@@ -152,6 +152,7 @@ class TipoPago(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(100), unique=True, nullable=False)
+    activo = db.Column(db.Boolean, default=True, nullable=False)
     creado_en = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     actualizado_en = db.Column(
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
