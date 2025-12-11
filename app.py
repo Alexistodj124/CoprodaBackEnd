@@ -99,6 +99,145 @@ def create_app():
         db.session.commit()
         return jsonify({"message": "Categoría eliminada"})
 
+    def producto_to_dict(producto: Producto) -> dict:
+        return {
+            "id": producto.id,
+            "nombre": producto.nombre,
+            "foto": producto.foto,
+            "codigo": producto.codigo,
+            "categoria_id": producto.categoria_id,
+            "precio_cf": float(producto.precio_cf),
+            "precio_minorista": float(producto.precio_minorista),
+            "precio_mayorista": float(producto.precio_mayorista),
+            "creado_en": producto.creado_en.isoformat() if producto.creado_en else None,
+            "actualizado_en": producto.actualizado_en.isoformat()
+            if producto.actualizado_en
+            else None,
+        }
+
+    @app.route("/productos", methods=["GET"])
+    def listar_productos():
+        productos = Producto.query.order_by(Producto.id).all()
+        return jsonify([producto_to_dict(p) for p in productos])
+
+    @app.route("/productos/<int:producto_id>", methods=["GET"])
+    def obtener_producto(producto_id: int):
+        producto = Producto.query.get_or_404(producto_id)
+        return jsonify(producto_to_dict(producto))
+
+    def _parse_precio(value, field_name: str):
+        if value is None:
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            raise ValueError(f"El campo {field_name} debe ser numérico")
+
+    @app.route("/productos", methods=["POST"])
+    def crear_producto():
+        data = request.get_json(silent=True) or {}
+        nombre = (data.get("nombre") or "").strip()
+        codigo = (data.get("codigo") or "").strip()
+        foto = (data.get("foto") or "").strip() or None
+        categoria_id = data.get("categoria_id")
+
+        if not nombre:
+            return jsonify({"error": "El nombre es requerido"}), 400
+        if not codigo:
+            return jsonify({"error": "El código es requerido"}), 400
+        if categoria_id is None:
+            return jsonify({"error": "La categoría es requerida"}), 400
+
+        conflicto = Producto.query.filter_by(codigo=codigo).first()
+        if conflicto:
+            return jsonify({"error": "Ya existe un producto con ese código"}), 409
+
+        categoria = CategoriaProducto.query.get(categoria_id)
+        if not categoria:
+            return jsonify({"error": "Categoría no encontrada"}), 404
+
+        try:
+            precio_cf = _parse_precio(data.get("precio_cf", 0), "precio_cf") or 0
+            precio_minorista = _parse_precio(
+                data.get("precio_minorista", 0), "precio_minorista"
+            ) or 0
+            precio_mayorista = _parse_precio(
+                data.get("precio_mayorista", 0), "precio_mayorista"
+            ) or 0
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+        producto = Producto(
+            nombre=nombre,
+            codigo=codigo,
+            foto=foto,
+            categoria_id=categoria_id,
+            precio_cf=precio_cf,
+            precio_minorista=precio_minorista,
+            precio_mayorista=precio_mayorista,
+        )
+        db.session.add(producto)
+        db.session.commit()
+        return jsonify(producto_to_dict(producto)), 201
+
+    @app.route("/productos/<int:producto_id>", methods=["PUT", "PATCH"])
+    def actualizar_producto(producto_id: int):
+        producto = Producto.query.get_or_404(producto_id)
+        data = request.get_json(silent=True) or {}
+
+        if "nombre" in data:
+            nombre = (data.get("nombre") or "").strip()
+            if not nombre:
+                return jsonify({"error": "El nombre es requerido"}), 400
+            producto.nombre = nombre
+
+        if "codigo" in data:
+            codigo = (data.get("codigo") or "").strip()
+            if not codigo:
+                return jsonify({"error": "El código es requerido"}), 400
+            conflicto = (
+                Producto.query.filter_by(codigo=codigo)
+                .filter(Producto.id != producto.id)
+                .first()
+            )
+            if conflicto:
+                return jsonify({"error": "Ya existe un producto con ese código"}), 409
+            producto.codigo = codigo
+
+        if "foto" in data:
+            producto.foto = (data.get("foto") or "").strip() or None
+
+        if "categoria_id" in data:
+            categoria_id = data.get("categoria_id")
+            categoria = CategoriaProducto.query.get(categoria_id)
+            if not categoria:
+                return jsonify({"error": "Categoría no encontrada"}), 404
+            producto.categoria_id = categoria_id
+
+        try:
+            if "precio_cf" in data:
+                producto.precio_cf = _parse_precio(data.get("precio_cf"), "precio_cf")
+            if "precio_minorista" in data:
+                producto.precio_minorista = _parse_precio(
+                    data.get("precio_minorista"), "precio_minorista"
+                )
+            if "precio_mayorista" in data:
+                producto.precio_mayorista = _parse_precio(
+                    data.get("precio_mayorista"), "precio_mayorista"
+                )
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+        db.session.commit()
+        return jsonify(producto_to_dict(producto))
+
+    @app.route("/productos/<int:producto_id>", methods=["DELETE"])
+    def eliminar_producto(producto_id: int):
+        producto = Producto.query.get_or_404(producto_id)
+        db.session.delete(producto)
+        db.session.commit()
+        return jsonify({"message": "Producto eliminado"})
+
     return app
 
 
