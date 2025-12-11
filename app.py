@@ -238,6 +238,93 @@ def create_app():
         db.session.commit()
         return jsonify({"message": "Producto eliminado"})
 
+    def cliente_to_dict(cliente: Cliente) -> dict:
+        return {
+            "id": cliente.id,
+            "codigo": cliente.codigo,
+            "nombre": cliente.nombre,
+            "telefono": cliente.telefono,
+            "direccion": cliente.direccion,
+            "creado_en": cliente.creado_en.isoformat() if cliente.creado_en else None,
+            "actualizado_en": cliente.actualizado_en.isoformat()
+            if cliente.actualizado_en
+            else None,
+        }
+
+    @app.route("/clientes", methods=["GET"])
+    def listar_clientes():
+        clientes = Cliente.query.order_by(Cliente.id).all()
+        return jsonify([cliente_to_dict(c) for c in clientes])
+
+    @app.route("/clientes/<int:cliente_id>", methods=["GET"])
+    def obtener_cliente(cliente_id: int):
+        cliente = Cliente.query.get_or_404(cliente_id)
+        return jsonify(cliente_to_dict(cliente))
+
+    @app.route("/clientes", methods=["POST"])
+    def crear_cliente():
+        data = request.get_json(silent=True) or {}
+        codigo = (data.get("codigo") or "").strip()
+        nombre = (data.get("nombre") or "").strip()
+        telefono = (data.get("telefono") or "").strip() or None
+        direccion = (data.get("direccion") or "").strip() or None
+
+        if not codigo:
+            return jsonify({"error": "El código es requerido"}), 400
+        if not nombre:
+            return jsonify({"error": "El nombre es requerido"}), 400
+
+        conflicto = Cliente.query.filter_by(codigo=codigo).first()
+        if conflicto:
+            return jsonify({"error": "Ya existe un cliente con ese código"}), 409
+
+        cliente = Cliente(
+            codigo=codigo, nombre=nombre, telefono=telefono, direccion=direccion
+        )
+        db.session.add(cliente)
+        db.session.commit()
+        return jsonify(cliente_to_dict(cliente)), 201
+
+    @app.route("/clientes/<int:cliente_id>", methods=["PUT", "PATCH"])
+    def actualizar_cliente(cliente_id: int):
+        cliente = Cliente.query.get_or_404(cliente_id)
+        data = request.get_json(silent=True) or {}
+
+        if "codigo" in data:
+            codigo = (data.get("codigo") or "").strip()
+            if not codigo:
+                return jsonify({"error": "El código es requerido"}), 400
+            conflicto = (
+                Cliente.query.filter_by(codigo=codigo)
+                .filter(Cliente.id != cliente.id)
+                .first()
+            )
+            if conflicto:
+                return jsonify({"error": "Ya existe un cliente con ese código"}), 409
+            cliente.codigo = codigo
+
+        if "nombre" in data:
+            nombre = (data.get("nombre") or "").strip()
+            if not nombre:
+                return jsonify({"error": "El nombre es requerido"}), 400
+            cliente.nombre = nombre
+
+        if "telefono" in data:
+            cliente.telefono = (data.get("telefono") or "").strip() or None
+
+        if "direccion" in data:
+            cliente.direccion = (data.get("direccion") or "").strip() or None
+
+        db.session.commit()
+        return jsonify(cliente_to_dict(cliente))
+
+    @app.route("/clientes/<int:cliente_id>", methods=["DELETE"])
+    def eliminar_cliente(cliente_id: int):
+        cliente = Cliente.query.get_or_404(cliente_id)
+        db.session.delete(cliente)
+        db.session.commit()
+        return jsonify({"message": "Cliente eliminado"})
+
     return app
 
 
