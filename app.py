@@ -14,6 +14,8 @@ from models import (
     Producto,
     TipoPago,
     Usuario,
+    Orden,
+    OrdenItem,
     db,
 )
 
@@ -800,6 +802,204 @@ def create_app():
         db.session.delete(estado)
         db.session.commit()
         return jsonify({"message": "Estado eliminado"})
+
+    def ordenitem_to_dict(item: OrdenItem) -> dict:
+        return {
+            "id": item.id,
+            "orden_id": item.orden_id,
+            "producto_id": item.producto_id,
+            "precio": float(item.precio),
+            "cantidad": item.cantidad,
+            "creado_en": item.creado_en.isoformat() if item.creado_en else None,
+            "actualizado_en": item.actualizado_en.isoformat()
+            if item.actualizado_en
+            else None,
+        }
+
+    def orden_to_dict(orden: Orden) -> dict:
+        return {
+            "id": orden.id,
+            "fecha": orden.fecha.isoformat() if orden.fecha else None,
+            "tipo_pago_id": orden.tipo_pago_id,
+            "estado_id": orden.estado_id,
+            "cliente_id": orden.cliente_id,
+            "items": [ordenitem_to_dict(i) for i in orden.items],
+            "creado_en": orden.creado_en.isoformat() if orden.creado_en else None,
+            "actualizado_en": orden.actualizado_en.isoformat()
+            if orden.actualizado_en
+            else None,
+        }
+
+    def _validate_fk(model, id_value, field_name: str):
+        if id_value is None:
+            raise ValueError(f"El campo {field_name} es requerido")
+        obj = model.query.get(id_value)
+        if not obj:
+            raise LookupError(f"{field_name} no encontrado")
+        return obj
+
+    def _parse_items(items_payload):
+        if items_payload is None:
+            return []
+        if not isinstance(items_payload, list) or not items_payload:
+            raise ValueError("items debe ser una lista no vacía")
+        parsed_items = []
+        for item in items_payload:
+            if not isinstance(item, dict):
+                raise ValueError("Cada item debe ser un objeto")
+            producto_id = item.get("producto_id")
+            cantidad = item.get("cantidad", 1)
+            precio = item.get("precio")
+            producto = Producto.query.get(producto_id)
+            if not producto:
+                raise LookupError("producto_id no encontrado")
+            try:
+                cantidad_int = int(cantidad)
+            except (TypeError, ValueError):
+                raise ValueError("cantidad debe ser entero")
+            if cantidad_int <= 0:
+                raise ValueError("cantidad debe ser mayor que cero")
+            try:
+                precio_val = _parse_precio(precio, "precio")
+            except ValueError as exc:
+                raise ValueError(str(exc))
+            if precio_val is None:
+                raise ValueError("precio es requerido")
+            parsed_items.append(
+                {
+                    "producto_id": producto_id,
+                    "cantidad": cantidad_int,
+                    "precio": precio_val,
+                }
+            )
+        return parsed_items
+
+    @app.route("/ordenes", methods=["GET"])
+    def listar_ordenes():
+        ordenes = Orden.query.order_by(Orden.id).all()
+        return jsonify([orden_to_dict(o) for o in ordenes])
+
+    @app.route("/ordenes/<int:orden_id>", methods=["GET"])
+    def obtener_orden(orden_id: int):
+        orden = Orden.query.get_or_404(orden_id)
+        return jsonify(orden_to_dict(orden))
+
+    @app.route("/ordenes", methods=["POST"])
+    def crear_orden():
+        data = request.get_json(silent=True) or {}
+        try:
+            fecha = _parse_fecha(data.get("fecha"))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+        tipo_pago_id = data.get("tipo_pago_id")
+        estado_id = data.get("estado_id")
+        cliente_id = data.get("cliente_id")
+
+        try:
+            _validate_fk(TipoPago, tipo_pago_id, "tipo_pago_id")
+            _validate_fk(EstadoOrden, estado_id, "estado_id")
+            _validate_fk(Cliente, cliente_id, "cliente_id")
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        except LookupError as exc:
+            return jsonify({"error": str(exc)}), 404
+
+        try:
+            items = _parse_items(data.get("items"))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        except LookupError as exc:
+            return jsonify({"error": str(exc)}), 404
+
+        orden = Orden(
+            fecha=fecha,
+            tipo_pago_id=tipo_pago_id,
+            estado_id=estado_id,
+            cliente_id=cliente_id,
+        )
+        db.session.add(orden)
+        db.session.flush()
+
+        for item in items:
+            orden_item = OrdenItem(
+                orden_id=orden.id,
+                producto_id=item["producto_id"],
+                precio=item["precio"],
+                cantidad=item["cantidad"],
+            )
+            db.session.add(orden_item)
+
+        db.session.commit()
+        return jsonify(orden_to_dict(orden)), 201
+
+    @app.route("/ordenes/<int:orden_id>", methods=["PUT", "PATCH"])
+    def actualizar_orden(orden_id: int):
+        orden = Orden.query.get_or_404(orden_id)
+        data = request.get_json(silent=True) or {}
+
+        if "fecha" in data:
+            try:
+                orden.fecha = _parse_fecha(data.get("fecha"))
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
+
+        if "tipo_pago_id" in data:
+            try:
+                _validate_fk(TipoPago, data.get("tipo_pago_id"), "tipo_pago_id")
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
+            except LookupError as exc:
+                return jsonify({"error": str(exc)}), 404
+            orden.tipo_pago_id = data.get("tipo_pago_id")
+
+        if "estado_id" in data:
+            try:
+                _validate_fk(EstadoOrden, data.get("estado_id"), "estado_id")
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
+            except LookupError as exc:
+                return jsonify({"error": str(exc)}), 404
+            orden.estado_id = data.get("estado_id")
+
+        if "cliente_id" in data:
+            try:
+                _validate_fk(Cliente, data.get("cliente_id"), "cliente_id")
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
+            except LookupError as exc:
+                return jsonify({"error": str(exc)}), 404
+            orden.cliente_id = data.get("cliente_id")
+
+        if "items" in data:
+            try:
+                nuevos_items = _parse_items(data.get("items"))
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
+            except LookupError as exc:
+                return jsonify({"error": str(exc)}), 404
+
+            OrdenItem.query.filter_by(orden_id=orden.id).delete()
+            for item in nuevos_items:
+                db.session.add(
+                    OrdenItem(
+                        orden_id=orden.id,
+                        producto_id=item["producto_id"],
+                        precio=item["precio"],
+                        cantidad=item["cantidad"],
+                    )
+                )
+
+        db.session.commit()
+        return jsonify(orden_to_dict(orden))
+
+    @app.route("/ordenes/<int:orden_id>", methods=["DELETE"])
+    def eliminar_orden(orden_id: int):
+        orden = Orden.query.get_or_404(orden_id)
+        OrdenItem.query.filter_by(orden_id=orden.id).delete()
+        db.session.delete(orden)
+        db.session.commit()
+        return jsonify({"message": "Orden eliminada"})
 
     return app
 
