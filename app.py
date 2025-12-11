@@ -591,6 +591,71 @@ def create_app():
         db.session.commit()
         return jsonify({"message": "Usuario eliminado"})
 
+    def permiso_to_dict(permiso: Permiso) -> dict:
+        return {
+            "id": permiso.id,
+            "nombre": permiso.nombre,
+            "creado_en": permiso.creado_en.isoformat() if permiso.creado_en else None,
+            "actualizado_en": permiso.actualizado_en.isoformat()
+            if permiso.actualizado_en
+            else None,
+        }
+
+    @app.route("/permisos", methods=["GET"])
+    def listar_permisos():
+        permisos = Permiso.query.order_by(Permiso.id).all()
+        return jsonify([permiso_to_dict(p) for p in permisos])
+
+    @app.route("/permisos/<int:permiso_id>", methods=["GET"])
+    def obtener_permiso(permiso_id: int):
+        permiso = Permiso.query.get_or_404(permiso_id)
+        return jsonify(permiso_to_dict(permiso))
+
+    @app.route("/permisos", methods=["POST"])
+    def crear_permiso():
+        data = request.get_json(silent=True) or {}
+        nombre = (data.get("nombre") or "").strip()
+
+        if not nombre:
+            return jsonify({"error": "El nombre es requerido"}), 400
+
+        conflicto = Permiso.query.filter_by(nombre=nombre).first()
+        if conflicto:
+            return jsonify({"error": "Ya existe un permiso con ese nombre"}), 409
+
+        permiso = Permiso(nombre=nombre)
+        db.session.add(permiso)
+        db.session.commit()
+        return jsonify(permiso_to_dict(permiso)), 201
+
+    @app.route("/permisos/<int:permiso_id>", methods=["PUT", "PATCH"])
+    def actualizar_permiso(permiso_id: int):
+        permiso = Permiso.query.get_or_404(permiso_id)
+        data = request.get_json(silent=True) or {}
+
+        if "nombre" in data:
+            nombre = (data.get("nombre") or "").strip()
+            if not nombre:
+                return jsonify({"error": "El nombre es requerido"}), 400
+            conflicto = (
+                Permiso.query.filter_by(nombre=nombre)
+                .filter(Permiso.id != permiso.id)
+                .first()
+            )
+            if conflicto:
+                return jsonify({"error": "Ya existe un permiso con ese nombre"}), 409
+            permiso.nombre = nombre
+
+        db.session.commit()
+        return jsonify(permiso_to_dict(permiso))
+
+    @app.route("/permisos/<int:permiso_id>", methods=["DELETE"])
+    def eliminar_permiso(permiso_id: int):
+        permiso = Permiso.query.get_or_404(permiso_id)
+        db.session.delete(permiso)
+        db.session.commit()
+        return jsonify({"message": "Permiso eliminado"})
+
     return app
 
 
