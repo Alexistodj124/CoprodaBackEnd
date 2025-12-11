@@ -9,6 +9,7 @@ from models import (
     Bancos,
     CategoriaProducto,
     Cliente,
+    EstadoOrden,
     Permiso,
     Producto,
     TipoPago,
@@ -734,6 +735,71 @@ def create_app():
         db.session.delete(tipopago)
         db.session.commit()
         return jsonify({"message": "Tipo de pago eliminado"})
+
+    def estadoorden_to_dict(estado: EstadoOrden) -> dict:
+        return {
+            "id": estado.id,
+            "nombre": estado.nombre,
+            "creado_en": estado.creado_en.isoformat() if estado.creado_en else None,
+            "actualizado_en": estado.actualizado_en.isoformat()
+            if estado.actualizado_en
+            else None,
+        }
+
+    @app.route("/estados_orden", methods=["GET"])
+    def listar_estados_orden():
+        estados = EstadoOrden.query.order_by(EstadoOrden.id).all()
+        return jsonify([estadoorden_to_dict(e) for e in estados])
+
+    @app.route("/estados_orden/<int:estado_id>", methods=["GET"])
+    def obtener_estado_orden(estado_id: int):
+        estado = EstadoOrden.query.get_or_404(estado_id)
+        return jsonify(estadoorden_to_dict(estado))
+
+    @app.route("/estados_orden", methods=["POST"])
+    def crear_estado_orden():
+        data = request.get_json(silent=True) or {}
+        nombre = (data.get("nombre") or "").strip()
+
+        if not nombre:
+            return jsonify({"error": "El nombre es requerido"}), 400
+
+        conflicto = EstadoOrden.query.filter_by(nombre=nombre).first()
+        if conflicto:
+            return jsonify({"error": "Ya existe un estado con ese nombre"}), 409
+
+        estado = EstadoOrden(nombre=nombre)
+        db.session.add(estado)
+        db.session.commit()
+        return jsonify(estadoorden_to_dict(estado)), 201
+
+    @app.route("/estados_orden/<int:estado_id>", methods=["PUT", "PATCH"])
+    def actualizar_estado_orden(estado_id: int):
+        estado = EstadoOrden.query.get_or_404(estado_id)
+        data = request.get_json(silent=True) or {}
+
+        if "nombre" in data:
+            nombre = (data.get("nombre") or "").strip()
+            if not nombre:
+                return jsonify({"error": "El nombre es requerido"}), 400
+            conflicto = (
+                EstadoOrden.query.filter_by(nombre=nombre)
+                .filter(EstadoOrden.id != estado.id)
+                .first()
+            )
+            if conflicto:
+                return jsonify({"error": "Ya existe un estado con ese nombre"}), 409
+            estado.nombre = nombre
+
+        db.session.commit()
+        return jsonify(estadoorden_to_dict(estado))
+
+    @app.route("/estados_orden/<int:estado_id>", methods=["DELETE"])
+    def eliminar_estado_orden(estado_id: int):
+        estado = EstadoOrden.query.get_or_404(estado_id)
+        db.session.delete(estado)
+        db.session.commit()
+        return jsonify({"message": "Estado eliminado"})
 
     return app
 
