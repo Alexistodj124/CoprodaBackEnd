@@ -5,7 +5,16 @@ from flask_cors import CORS
 from flask_migrate import Migrate
 
 from config import Config
-from models import Bancos, CategoriaProducto, Cliente, Permiso, Producto, Usuario, db
+from models import (
+    Bancos,
+    CategoriaProducto,
+    Cliente,
+    Permiso,
+    Producto,
+    TipoPago,
+    Usuario,
+    db,
+)
 
 
 
@@ -655,6 +664,76 @@ def create_app():
         db.session.delete(permiso)
         db.session.commit()
         return jsonify({"message": "Permiso eliminado"})
+
+    def tipopago_to_dict(tipopago: TipoPago) -> dict:
+        return {
+            "id": tipopago.id,
+            "nombre": tipopago.nombre,
+            "activo": tipopago.activo,
+            "creado_en": tipopago.creado_en.isoformat() if tipopago.creado_en else None,
+            "actualizado_en": tipopago.actualizado_en.isoformat()
+            if tipopago.actualizado_en
+            else None,
+        }
+
+    @app.route("/tipos_pago", methods=["GET"])
+    def listar_tipos_pago():
+        tipos = TipoPago.query.order_by(TipoPago.id).all()
+        return jsonify([tipopago_to_dict(t) for t in tipos])
+
+    @app.route("/tipos_pago/<int:tipopago_id>", methods=["GET"])
+    def obtener_tipo_pago(tipopago_id: int):
+        tipopago = TipoPago.query.get_or_404(tipopago_id)
+        return jsonify(tipopago_to_dict(tipopago))
+
+    @app.route("/tipos_pago", methods=["POST"])
+    def crear_tipo_pago():
+        data = request.get_json(silent=True) or {}
+        nombre = (data.get("nombre") or "").strip()
+        activo = _parse_bool(data.get("activo"), default=True)
+
+        if not nombre:
+            return jsonify({"error": "El nombre es requerido"}), 400
+
+        conflicto = TipoPago.query.filter_by(nombre=nombre).first()
+        if conflicto:
+            return jsonify({"error": "Ya existe un tipo de pago con ese nombre"}), 409
+
+        tipopago = TipoPago(nombre=nombre, activo=activo)
+        db.session.add(tipopago)
+        db.session.commit()
+        return jsonify(tipopago_to_dict(tipopago)), 201
+
+    @app.route("/tipos_pago/<int:tipopago_id>", methods=["PUT", "PATCH"])
+    def actualizar_tipo_pago(tipopago_id: int):
+        tipopago = TipoPago.query.get_or_404(tipopago_id)
+        data = request.get_json(silent=True) or {}
+
+        if "nombre" in data:
+            nombre = (data.get("nombre") or "").strip()
+            if not nombre:
+                return jsonify({"error": "El nombre es requerido"}), 400
+            conflicto = (
+                TipoPago.query.filter_by(nombre=nombre)
+                .filter(TipoPago.id != tipopago.id)
+                .first()
+            )
+            if conflicto:
+                return jsonify({"error": "Ya existe un tipo de pago con ese nombre"}), 409
+            tipopago.nombre = nombre
+
+        if "activo" in data:
+            tipopago.activo = _parse_bool(data.get("activo"), default=tipopago.activo)
+
+        db.session.commit()
+        return jsonify(tipopago_to_dict(tipopago))
+
+    @app.route("/tipos_pago/<int:tipopago_id>", methods=["DELETE"])
+    def eliminar_tipo_pago(tipopago_id: int):
+        tipopago = TipoPago.query.get_or_404(tipopago_id)
+        db.session.delete(tipopago)
+        db.session.commit()
+        return jsonify({"message": "Tipo de pago eliminado"})
 
     return app
 
