@@ -3,6 +3,8 @@ from datetime import datetime
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_migrate import Migrate
+from werkzeug.middleware.dispatcher import DispatcherMiddleware
+from werkzeug.wrappers import Response
 
 from config import Config
 from models import (
@@ -1027,6 +1029,14 @@ def create_app():
         db.session.delete(orden)
         db.session.commit()
         return jsonify({"message": "Orden eliminada"})
+
+    prefix = app.config.get("URL_PREFIX", "/coproda")
+    if prefix:
+        # Montar la app bajo un prefijo (por ejemplo /coproda)
+        def _not_found(environ, start_response):
+            return Response("Not Found", status=404)(environ, start_response)
+
+        app.wsgi_app = DispatcherMiddleware(_not_found, {prefix: app.wsgi_app})
 
     return app
 
