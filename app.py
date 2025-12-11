@@ -5,7 +5,7 @@ from flask_cors import CORS
 from flask_migrate import Migrate
 
 from config import Config
-from models import Bancos, CategoriaProducto, Cliente, Producto, db
+from models import Bancos, CategoriaProducto, Cliente, Permiso, Producto, Usuario, db
 
 
 
@@ -478,6 +478,118 @@ def create_app():
         db.session.delete(pago)
         db.session.commit()
         return jsonify({"message": "Pago eliminado"})
+
+    def usuario_to_dict(usuario: Usuario) -> dict:
+        return {
+            "id": usuario.id,
+            "usuario": usuario.usuario,
+            "activo": usuario.activo,
+            "permisos": [p.nombre for p in usuario.permisos.all()],
+            "creado_en": usuario.creado_en.isoformat() if usuario.creado_en else None,
+            "actualizado_en": usuario.actualizado_en.isoformat()
+            if usuario.actualizado_en
+            else None,
+        }
+
+    @app.route("/usuarios", methods=["GET"])
+    def listar_usuarios():
+        usuarios = Usuario.query.order_by(Usuario.id).all()
+        return jsonify([usuario_to_dict(u) for u in usuarios])
+
+    @app.route("/usuarios/<int:usuario_id>", methods=["GET"])
+    def obtener_usuario(usuario_id: int):
+        usuario = Usuario.query.get_or_404(usuario_id)
+        return jsonify(usuario_to_dict(usuario))
+
+    def _get_permisos_from_payload(permisos_nombres):
+        if permisos_nombres is None:
+            return []
+        if not isinstance(permisos_nombres, list):
+            raise ValueError("permisos debe ser una lista de nombres")
+        permisos = []
+        for nombre in permisos_nombres:
+            if not isinstance(nombre, str) or not nombre.strip():
+                raise ValueError("Cada permiso debe ser un string no vacío")
+            perm = Permiso.query.filter_by(nombre=nombre.strip()).first()
+            if not perm:
+                perm = Permiso(nombre=nombre.strip())
+                db.session.add(perm)
+            permisos.append(perm)
+        return permisos
+
+    @app.route("/usuarios", methods=["POST"])
+    def crear_usuario():
+        data = request.get_json(silent=True) or {}
+        nombre_usuario = (data.get("usuario") or "").strip()
+        contrasena = data.get("contrasena")
+        activo = _parse_bool(data.get("activo"), default=True)
+        permisos_nombres = data.get("permisos")
+
+        if not nombre_usuario:
+            return jsonify({"error": "El usuario es requerido"}), 400
+        if not contrasena:
+            return jsonify({"error": "La contraseña es requerida"}), 400
+
+        conflicto = Usuario.query.filter_by(usuario=nombre_usuario).first()
+        if conflicto:
+            return jsonify({"error": "Ya existe un usuario con ese nombre"}), 409
+
+        try:
+            permisos = _get_permisos_from_payload(permisos_nombres)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+        usuario = Usuario(usuario=nombre_usuario, activo=activo)
+        usuario.set_password(contrasena)
+        usuario.permisos.extend(permisos)
+        db.session.add(usuario)
+        db.session.commit()
+        return jsonify(usuario_to_dict(usuario)), 201
+
+    @app.route("/usuarios/<int:usuario_id>", methods=["PUT", "PATCH"])
+    def actualizar_usuario(usuario_id: int):
+        usuario = Usuario.query.get_or_404(usuario_id)
+        data = request.get_json(silent=True) or {}
+
+        if "usuario" in data:
+            nombre_usuario = (data.get("usuario") or "").strip()
+            if not nombre_usuario:
+                return jsonify({"error": "El usuario es requerido"}), 400
+            conflicto = (
+                Usuario.query.filter_by(usuario=nombre_usuario)
+                .filter(Usuario.id != usuario.id)
+                .first()
+            )
+            if conflicto:
+                return jsonify({"error": "Ya existe un usuario con ese nombre"}), 409
+            usuario.usuario = nombre_usuario
+
+        if "contrasena" in data:
+            contrasena = data.get("contrasena")
+            if not contrasena:
+                return jsonify({"error": "La contraseña es requerida"}), 400
+            usuario.set_password(contrasena)
+
+        if "activo" in data:
+            usuario.activo = _parse_bool(data.get("activo"), default=usuario.activo)
+
+        if "permisos" in data:
+            permisos_nombres = data.get("permisos")
+            try:
+                nuevos_permisos = _get_permisos_from_payload(permisos_nombres)
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
+            usuario.permisos = nuevos_permisos
+
+        db.session.commit()
+        return jsonify(usuario_to_dict(usuario))
+
+    @app.route("/usuarios/<int:usuario_id>", methods=["DELETE"])
+    def eliminar_usuario(usuario_id: int):
+        usuario = Usuario.query.get_or_404(usuario_id)
+        db.session.delete(usuario)
+        db.session.commit()
+        return jsonify({"message": "Usuario eliminado"})
 
     return app
 
