@@ -259,6 +259,7 @@ def create_app():
             "nombre": cliente.nombre,
             "telefono": cliente.telefono,
             "direccion": cliente.direccion,
+            "clasificacion_precio": cliente.clasificacion_precio,
             "creado_en": cliente.creado_en.isoformat() if cliente.creado_en else None,
             "actualizado_en": cliente.actualizado_en.isoformat()
             if cliente.actualizado_en
@@ -282,6 +283,7 @@ def create_app():
         nombre = (data.get("nombre") or "").strip()
         telefono = (data.get("telefono") or "").strip() or None
         direccion = (data.get("direccion") or "").strip() or None
+        clasificacion_precio = (data.get("clasificacion_precio") or "cf").strip().lower()
 
         if not codigo:
             return jsonify({"error": "El código es requerido"}), 400
@@ -292,8 +294,20 @@ def create_app():
         if conflicto:
             return jsonify({"error": "Ya existe un cliente con ese código"}), 409
 
+        if clasificacion_precio not in ("cf", "minorista", "mayorista"):
+            return (
+                jsonify(
+                    {"error": "clasificacion_precio debe ser cf, minorista o mayorista"}
+                ),
+                400,
+            )
+
         cliente = Cliente(
-            codigo=codigo, nombre=nombre, telefono=telefono, direccion=direccion
+            codigo=codigo,
+            nombre=nombre,
+            telefono=telefono,
+            direccion=direccion,
+            clasificacion_precio=clasificacion_precio,
         )
         db.session.add(cliente)
         db.session.commit()
@@ -328,6 +342,19 @@ def create_app():
 
         if "direccion" in data:
             cliente.direccion = (data.get("direccion") or "").strip() or None
+
+        if "clasificacion_precio" in data:
+            clasificacion_precio = (data.get("clasificacion_precio") or "").strip().lower()
+            if clasificacion_precio not in ("cf", "minorista", "mayorista"):
+                return (
+                    jsonify(
+                        {
+                            "error": "clasificacion_precio debe ser cf, minorista o mayorista"
+                        }
+                    ),
+                    400,
+                )
+            cliente.clasificacion_precio = clasificacion_precio
 
         db.session.commit()
         return jsonify(cliente_to_dict(cliente))
