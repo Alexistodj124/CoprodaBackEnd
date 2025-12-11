@@ -1,9 +1,11 @@
+from datetime import datetime
+
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_migrate import Migrate
 
 from config import Config
-from models import CategoriaProducto, Cliente, Producto, db
+from models import Bancos, CategoriaProducto, Cliente, Producto, db
 
 
 
@@ -324,6 +326,158 @@ def create_app():
         db.session.delete(cliente)
         db.session.commit()
         return jsonify({"message": "Cliente eliminado"})
+
+    def _parse_fecha(value):
+        if value is None:
+            return None
+        if isinstance(value, str) and not value.strip():
+            return None
+        try:
+            if isinstance(value, str):
+                return datetime.fromisoformat(value).date()
+            return value
+        except (ValueError, TypeError):
+            raise ValueError("El formato de fecha debe ser YYYY-MM-DD")
+
+    def _parse_bool(value, default=None):
+        if value is None:
+            return default
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            val = value.strip().lower()
+            if val in ("true", "1", "t", "yes", "y"):
+                return True
+            if val in ("false", "0", "f", "no", "n"):
+                return False
+        return bool(value)
+
+    def banco_to_dict(banco: Bancos) -> dict:
+        return {
+            "id": banco.id,
+            "fecha": banco.fecha.isoformat() if banco.fecha else None,
+            "referencia": banco.referencia,
+            "banco": banco.banco,
+            "monto": float(banco.monto),
+            "nota": banco.nota,
+            "asignado": banco.asignado,
+            "cliente_id": banco.cliente_id,
+            "creado_en": banco.creado_en.isoformat() if banco.creado_en else None,
+            "actualizado_en": banco.actualizado_en.isoformat()
+            if banco.actualizado_en
+            else None,
+        }
+
+    @app.route("/bancos", methods=["GET"])
+    def listar_bancos():
+        pagos = Bancos.query.order_by(Bancos.id).all()
+        return jsonify([banco_to_dict(p) for p in pagos])
+
+    @app.route("/bancos/<int:banco_id>", methods=["GET"])
+    def obtener_banco(banco_id: int):
+        pago = Bancos.query.get_or_404(banco_id)
+        return jsonify(banco_to_dict(pago))
+
+    @app.route("/bancos", methods=["POST"])
+    def crear_banco():
+        data = request.get_json(silent=True) or {}
+
+        referencia = (data.get("referencia") or "").strip()
+        nombre_banco = (data.get("banco") or "").strip()
+        monto_val = data.get("monto")
+        nota = (data.get("nota") or "").strip() or None
+        asignado = _parse_bool(data.get("asignado"), default=False)
+        cliente_id = data.get("cliente_id")
+
+        if not referencia:
+            return jsonify({"error": "La referencia es requerida"}), 400
+        if not nombre_banco:
+            return jsonify({"error": "El banco es requerido"}), 400
+        try:
+            monto = _parse_precio(monto_val, "monto")
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        if monto is None:
+            return jsonify({"error": "El monto es requerido"}), 400
+
+        try:
+            fecha = _parse_fecha(data.get("fecha"))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+        if cliente_id is not None:
+            cliente = Cliente.query.get(cliente_id)
+            if not cliente:
+                return jsonify({"error": "Cliente no encontrado"}), 404
+
+        pago = Bancos(
+            fecha=fecha,
+            referencia=referencia,
+            banco=nombre_banco,
+            monto=monto,
+            nota=nota,
+            asignado=asignado,
+            cliente_id=cliente_id,
+        )
+        db.session.add(pago)
+        db.session.commit()
+        return jsonify(banco_to_dict(pago)), 201
+
+    @app.route("/bancos/<int:banco_id>", methods=["PUT", "PATCH"])
+    def actualizar_banco(banco_id: int):
+        pago = Bancos.query.get_or_404(banco_id)
+        data = request.get_json(silent=True) or {}
+
+        if "referencia" in data:
+            referencia = (data.get("referencia") or "").strip()
+            if not referencia:
+                return jsonify({"error": "La referencia es requerida"}), 400
+            pago.referencia = referencia
+
+        if "banco" in data:
+            nombre_banco = (data.get("banco") or "").strip()
+            if not nombre_banco:
+                return jsonify({"error": "El banco es requerido"}), 400
+            pago.banco = nombre_banco
+
+        if "monto" in data:
+            try:
+                nuevo_monto = _parse_precio(data.get("monto"), "monto")
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
+            if nuevo_monto is None:
+                return jsonify({"error": "El monto es requerido"}), 400
+            pago.monto = nuevo_monto
+
+        if "nota" in data:
+            pago.nota = (data.get("nota") or "").strip() or None
+
+        if "asignado" in data:
+            pago.asignado = _parse_bool(data.get("asignado"), default=pago.asignado)
+
+        if "fecha" in data:
+            try:
+                pago.fecha = _parse_fecha(data.get("fecha"))
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
+
+        if "cliente_id" in data:
+            cliente_id = data.get("cliente_id")
+            if cliente_id is not None:
+                cliente = Cliente.query.get(cliente_id)
+                if not cliente:
+                    return jsonify({"error": "Cliente no encontrado"}), 404
+            pago.cliente_id = cliente_id
+
+        db.session.commit()
+        return jsonify(banco_to_dict(pago))
+
+    @app.route("/bancos/<int:banco_id>", methods=["DELETE"])
+    def eliminar_banco(banco_id: int):
+        pago = Bancos.query.get_or_404(banco_id)
+        db.session.delete(pago)
+        db.session.commit()
+        return jsonify({"message": "Pago eliminado"})
 
     return app
 
