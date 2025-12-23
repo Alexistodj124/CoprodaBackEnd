@@ -29,7 +29,7 @@ class Producto(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(150), nullable=False)
-    foto = db.Column(db.String(255))
+    foto = db.Column(db.Text)
     codigo = db.Column(db.String(50), unique=True, nullable=False, index=True)
     categoria_id = db.Column(
         db.Integer, db.ForeignKey("categorias_producto.id"), nullable=False
