@@ -1,4 +1,6 @@
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
+import re
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -407,6 +409,12 @@ def create_app():
                 return False
         return bool(value)
 
+    def _dias_credito_from_tipo_pago(tipo_pago: TipoPago) -> int:
+        if not tipo_pago or not tipo_pago.nombre:
+            return 0
+        match = re.search(r"\d+", tipo_pago.nombre)
+        return int(match.group()) if match else 0
+
     def banco_to_dict(banco: Bancos) -> dict:
         return {
             "id": banco.id,
@@ -533,6 +541,90 @@ def create_app():
         db.session.delete(pago)
         db.session.commit()
         return jsonify({"message": "Pago eliminado"})
+
+    @app.route("/ordenes/abonos", methods=["POST"])
+    def crear_abono_orden():
+        data = request.get_json(silent=True) or {}
+        cliente_id = data.get("cliente_id")
+        banco_id = data.get("banco_id")
+
+        if cliente_id is None:
+            return jsonify({"error": "cliente_id es requerido"}), 400
+        if banco_id is None:
+            return jsonify({"error": "banco_id es requerido"}), 400
+
+        cliente = Cliente.query.get(cliente_id)
+        if not cliente:
+            return jsonify({"error": "Cliente no encontrado"}), 404
+
+        banco = Bancos.query.get(banco_id)
+        if not banco:
+            return jsonify({"error": "Banco no encontrado"}), 404
+        if banco.asignado:
+            return jsonify({"error": "El pago del banco ya fue asignado"}), 409
+        if banco.monto is None or banco.monto <= 0:
+            return jsonify({"error": "El monto del banco debe ser mayor que cero"}), 400
+
+        ordenes = (
+            Orden.query.filter_by(cliente_id=cliente_id)
+            .filter(Orden.saldo > 0)
+            .filter(Orden.estado_id != 4)
+            .all()
+        )
+        if not ordenes:
+            return jsonify({"error": "No hay ordenes con saldo"}), 404
+
+        ordenes_ordenadas = sorted(
+            ordenes,
+            key=lambda orden: (
+                _dias_credito_from_tipo_pago(orden.tipo_pago),
+                orden.fecha or date.min,
+                orden.id,
+            ),
+        )
+
+        restante = Decimal(banco.monto)
+        asignaciones = []
+        for orden in ordenes_ordenadas:
+            if restante <= 0:
+                break
+            saldo_actual = Decimal(orden.saldo)
+            if saldo_actual <= 0:
+                continue
+            aplicar = saldo_actual if saldo_actual <= restante else restante
+            nuevo_saldo = saldo_actual - aplicar
+            if nuevo_saldo <= 0:
+                orden.saldo = Decimal("0.00")
+                orden.estado_id = 4
+            else:
+                orden.saldo = nuevo_saldo
+            restante -= aplicar
+            asignaciones.append(
+                {
+                    "orden_id": orden.id,
+                    "aplicado": float(aplicar),
+                    "saldo_nuevo": float(orden.saldo),
+                    "estado_id": orden.estado_id,
+                }
+            )
+
+        banco.asignado = True
+        banco.cliente_id = cliente_id
+        cliente.saldo = (cliente.saldo or 0) - (Decimal(banco.monto) - restante)
+
+        db.session.commit()
+        return (
+            jsonify(
+                {
+                    "banco_id": banco.id,
+                    "cliente_id": cliente_id,
+                    "monto": float(banco.monto),
+                    "restante": float(restante),
+                    "asignaciones": asignaciones,
+                }
+            ),
+            200,
+        )
 
     def usuario_to_dict(usuario: Usuario) -> dict:
         return {
