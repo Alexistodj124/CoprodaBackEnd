@@ -262,6 +262,7 @@ def create_app():
             "telefono": cliente.telefono,
             "direccion": cliente.direccion,
             "clasificacion_precio": cliente.clasificacion_precio,
+            "saldo": float(cliente.saldo),
             "creado_en": cliente.creado_en.isoformat() if cliente.creado_en else None,
             "actualizado_en": cliente.actualizado_en.isoformat()
             if cliente.actualizado_en
@@ -286,6 +287,7 @@ def create_app():
         telefono = (data.get("telefono") or "").strip() or None
         direccion = (data.get("direccion") or "").strip() or None
         clasificacion_precio = (data.get("clasificacion_precio") or "cf").strip().lower()
+        saldo_val = data.get("saldo", 0)
 
         if not codigo:
             return jsonify({"error": "El código es requerido"}), 400
@@ -304,12 +306,18 @@ def create_app():
                 400,
             )
 
+        try:
+            saldo = _parse_precio(saldo_val, "saldo") or 0
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+
         cliente = Cliente(
             codigo=codigo,
             nombre=nombre,
             telefono=telefono,
             direccion=direccion,
             clasificacion_precio=clasificacion_precio,
+            saldo=saldo,
         )
         db.session.add(cliente)
         db.session.commit()
@@ -357,6 +365,12 @@ def create_app():
                     400,
                 )
             cliente.clasificacion_precio = clasificacion_precio
+
+        if "saldo" in data:
+            try:
+                cliente.saldo = _parse_precio(data.get("saldo"), "saldo") or 0
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
 
         db.session.commit()
         return jsonify(cliente_to_dict(cliente))

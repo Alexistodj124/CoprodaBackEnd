@@ -57,6 +57,7 @@ class Cliente(db.Model):
     telefono = db.Column(db.String(30))
     direccion = db.Column(db.String(255))
     clasificacion_precio = db.Column(db.String(20), nullable=False, default="cf")
+    saldo = db.Column(Numeric(12, 2), default=0, nullable=False)
     creado_en = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     actualizado_en = db.Column(
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
