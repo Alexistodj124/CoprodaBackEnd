@@ -1085,6 +1085,7 @@ def create_app():
     def actualizar_orden(orden_id: int):
         orden = Orden.query.get_or_404(orden_id)
         data = request.get_json(silent=True) or {}
+        estado_anterior_id = orden.estado_id
 
         if "fecha" in data:
             try:
@@ -1146,6 +1147,11 @@ def create_app():
                 orden.saldo = _parse_precio(data.get("saldo"), "saldo") or 0
             except ValueError as exc:
                 return jsonify({"error": str(exc)}), 400
+
+        if "estado_id" in data and estado_anterior_id != 3 and orden.estado_id == 3:
+            cliente = Cliente.query.get(orden.cliente_id)
+            if cliente:
+                cliente.saldo = (cliente.saldo or 0) + Decimal(orden.saldo)
 
         db.session.commit()
         return jsonify(orden_to_dict(orden))
