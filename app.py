@@ -1152,7 +1152,7 @@ def create_app():
             except ValueError as exc:
                 return jsonify({"error": str(exc)}), 400
 
-        if "estado_id" in data and estado_anterior_id != 3 and orden.estado_id == 3:
+        if "estado_id" in data and data.get("estado_id") == 3:
             cliente = Cliente.query.get(orden.cliente_id)
             if cliente:
                 cliente.saldo = (cliente.saldo or 0) + Decimal(orden.saldo)
