@@ -158,6 +158,7 @@ def create_app():
             "foto": producto.foto,
             "codigo": producto.codigo,
             "categoria_id": producto.categoria_id,
+            "activo": producto.activo,
             "precio_cf": float(producto.precio_cf),
             "precio_minorista": float(producto.precio_minorista),
             "precio_mayorista": float(producto.precio_mayorista),
@@ -192,6 +193,7 @@ def create_app():
         codigo = (data.get("codigo") or "").strip()
         foto = (data.get("foto") or "").strip() or None
         categoria_id = data.get("categoria_id")
+        activo = _parse_bool(data.get("activo"), default=True)
 
         if not nombre:
             return jsonify({"error": "El nombre es requerido"}), 400
@@ -224,6 +226,7 @@ def create_app():
             codigo=codigo,
             foto=foto,
             categoria_id=categoria_id,
+            activo=activo,
             precio_cf=precio_cf,
             precio_minorista=precio_minorista,
             precio_mayorista=precio_mayorista,
@@ -266,6 +269,9 @@ def create_app():
                 return jsonify({"error": "Categoría no encontrada"}), 404
             producto.categoria_id = categoria_id
 
+        if "activo" in data:
+            producto.activo = _parse_bool(data.get("activo"), default=producto.activo)
+
         try:
             if "precio_cf" in data:
                 producto.precio_cf = _parse_precio(data.get("precio_cf"), "precio_cf")
@@ -299,6 +305,7 @@ def create_app():
             "direccion": cliente.direccion,
             "clasificacion_precio": cliente.clasificacion_precio,
             "saldo": float(cliente.saldo),
+            "activo": cliente.activo,
             "creado_en": cliente.creado_en.isoformat() if cliente.creado_en else None,
             "actualizado_en": cliente.actualizado_en.isoformat()
             if cliente.actualizado_en
@@ -324,6 +331,7 @@ def create_app():
         direccion = (data.get("direccion") or "").strip() or None
         clasificacion_precio = (data.get("clasificacion_precio") or "cf").strip().lower()
         saldo_val = data.get("saldo", 0)
+        activo = _parse_bool(data.get("activo"), default=True)
 
         if not codigo:
             return jsonify({"error": "El código es requerido"}), 400
@@ -354,6 +362,7 @@ def create_app():
             direccion=direccion,
             clasificacion_precio=clasificacion_precio,
             saldo=saldo,
+            activo=activo,
         )
         db.session.add(cliente)
         db.session.commit()
@@ -407,6 +416,9 @@ def create_app():
                 cliente.saldo = _parse_precio(data.get("saldo"), "saldo") or 0
             except ValueError as exc:
                 return jsonify({"error": str(exc)}), 400
+
+        if "activo" in data:
+            cliente.activo = _parse_bool(data.get("activo"), default=cliente.activo)
 
         db.session.commit()
         return jsonify(cliente_to_dict(cliente))

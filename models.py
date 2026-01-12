@@ -34,6 +34,7 @@ class Producto(db.Model):
     categoria_id = db.Column(
         db.Integer, db.ForeignKey("categorias_producto.id"), nullable=False
     )
+    activo = db.Column(db.Boolean, default=True, nullable=False)
     precio_cf = db.Column(Numeric(12, 2), default=0, nullable=False)
     precio_minorista = db.Column(Numeric(12, 2), default=0, nullable=False)
     precio_mayorista = db.Column(Numeric(12, 2), default=0, nullable=False)
@@ -58,6 +59,7 @@ class Cliente(db.Model):
     direccion = db.Column(db.String(255))
     clasificacion_precio = db.Column(db.String(20), nullable=False, default="cf")
     saldo = db.Column(Numeric(12, 2), default=0, nullable=False)
+    activo = db.Column(db.Boolean, default=True, nullable=False)
     creado_en = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     actualizado_en = db.Column(
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
