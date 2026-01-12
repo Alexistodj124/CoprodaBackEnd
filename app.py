@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 import re
 
@@ -574,13 +574,17 @@ def create_app():
         if not ordenes:
             return jsonify({"error": "No hay ordenes con saldo"}), 404
 
+        today = date.today()
+
+        def _dias_restantes(orden: Orden) -> int:
+            dias_credito = _dias_credito_from_tipo_pago(orden.tipo_pago)
+            fecha_base = orden.fecha or today
+            vencimiento = fecha_base + timedelta(days=dias_credito)
+            return (vencimiento - today).days
+
         ordenes_ordenadas = sorted(
             ordenes,
-            key=lambda orden: (
-                _dias_credito_from_tipo_pago(orden.tipo_pago),
-                orden.fecha or date.min,
-                orden.id,
-            ),
+            key=lambda orden: (_dias_restantes(orden), orden.fecha or date.min, orden.id),
         )
 
         restante = Decimal(banco.monto)
