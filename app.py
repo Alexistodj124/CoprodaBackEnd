@@ -44,6 +44,40 @@ def create_app():
     def index():
         return jsonify({"message": "API funcionando"})
 
+    @app.route("/auth/login", methods=["POST"])
+    def login():
+        """
+        Login básico.
+
+        Espera JSON:
+        {
+        "usuario": "ana",
+        "contrasena": "mi_contrasena"
+        }
+
+        Responde 200 si las credenciales son correctas,
+        401 si no.
+        """
+        data = request.get_json(silent=True) or {}
+        nombre_usuario = (data.get("usuario") or data.get("username") or "").strip()
+        contrasena = data.get("contrasena") or data.get("password")
+
+        if not nombre_usuario or not contrasena:
+            return jsonify({"error": "usuario y contrasena son requeridos"}), 400
+
+        usuario = Usuario.query.filter_by(usuario=nombre_usuario).first()
+        if not usuario or not usuario.check_password(contrasena):
+            return jsonify({"error": "credenciales invalidas"}), 401
+
+        return jsonify(
+            {
+                "id": usuario.id,
+                "usuario": usuario.usuario,
+                "activo": usuario.activo,
+                "permisos": [p.nombre for p in usuario.permisos.all()],
+            }
+        )
+
     # ---------- CRUD PRODUCTOS ----------
 
     def categoria_to_dict(categoria: CategoriaProducto) -> dict:
