@@ -993,6 +993,7 @@ def create_app():
         return {
             "id": orden.id,
             "fecha": orden.fecha.isoformat() if orden.fecha else None,
+            "usuario_id": orden.usuario_id,
             "tipo_pago_id": orden.tipo_pago_id,
             "estado_id": orden.estado_id,
             "cliente_id": orden.cliente_id,
@@ -1070,9 +1071,12 @@ def create_app():
         tipo_pago_id = data.get("tipo_pago_id")
         estado_id = data.get("estado_id")
         cliente_id = data.get("cliente_id")
+        usuario_id = data.get("usuario_id")
         saldo_val = data.get("saldo")
 
         try:
+            if usuario_id is not None:
+                _validate_fk(Usuario, usuario_id, "usuario_id")
             _validate_fk(TipoPago, tipo_pago_id, "tipo_pago_id")
             _validate_fk(EstadoOrden, estado_id, "estado_id")
             _validate_fk(Cliente, cliente_id, "cliente_id")
@@ -1098,6 +1102,7 @@ def create_app():
 
         orden = Orden(
             fecha=fecha,
+            usuario_id=usuario_id,
             tipo_pago_id=tipo_pago_id,
             estado_id=estado_id,
             cliente_id=cliente_id,
@@ -1139,6 +1144,16 @@ def create_app():
             except LookupError as exc:
                 return jsonify({"error": str(exc)}), 404
             orden.tipo_pago_id = data.get("tipo_pago_id")
+
+        if "usuario_id" in data:
+            usuario_id = data.get("usuario_id")
+            try:
+                _validate_fk(Usuario, usuario_id, "usuario_id")
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
+            except LookupError as exc:
+                return jsonify({"error": str(exc)}), 404
+            orden.usuario_id = usuario_id
 
         if "estado_id" in data:
             try:

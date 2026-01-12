@@ -117,6 +117,7 @@ class Usuario(db.Model):
         back_populates="usuarios",
         lazy="dynamic",
     )
+    ordenes = db.relationship("Orden", back_populates="usuario", lazy="dynamic")
 
     def set_password(self, password: str) -> None:
         self.contrasena = generate_password_hash(password)
@@ -187,6 +188,7 @@ class Orden(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     fecha = db.Column(db.Date, default=datetime.utcnow, nullable=False)
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"))
     tipo_pago_id = db.Column(db.Integer, db.ForeignKey("tipos_pago.id"), nullable=False)
     estado_id = db.Column(
         db.Integer, db.ForeignKey("estados_orden.id"), nullable=False
@@ -202,6 +204,7 @@ class Orden(db.Model):
     tipo_pago = db.relationship("TipoPago", back_populates="ordenes")
     estado = db.relationship("EstadoOrden", back_populates="ordenes")
     cliente = db.relationship("Cliente", back_populates="ordenes")
+    usuario = db.relationship("Usuario", back_populates="ordenes")
     items = db.relationship("OrdenItem", back_populates="orden", lazy="dynamic")
 
     def __repr__(self) -> str:
