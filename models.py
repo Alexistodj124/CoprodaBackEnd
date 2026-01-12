@@ -192,6 +192,8 @@ class Orden(db.Model):
         db.Integer, db.ForeignKey("estados_orden.id"), nullable=False
     )
     cliente_id = db.Column(db.Integer, db.ForeignKey("clientes.id"), nullable=False)
+    total = db.Column(Numeric(12, 2), default=0, nullable=False)
+    saldo = db.Column(Numeric(12, 2), default=0, nullable=False)
     creado_en = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     actualizado_en = db.Column(
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False

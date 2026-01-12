@@ -866,6 +866,8 @@ def create_app():
             "tipo_pago_id": orden.tipo_pago_id,
             "estado_id": orden.estado_id,
             "cliente_id": orden.cliente_id,
+            "total": float(orden.total),
+            "saldo": float(orden.saldo),
             "items": [ordenitem_to_dict(i) for i in orden.items],
             "creado_en": orden.creado_en.isoformat() if orden.creado_en else None,
             "actualizado_en": orden.actualizado_en.isoformat()
@@ -938,6 +940,7 @@ def create_app():
         tipo_pago_id = data.get("tipo_pago_id")
         estado_id = data.get("estado_id")
         cliente_id = data.get("cliente_id")
+        saldo_val = data.get("saldo")
 
         try:
             _validate_fk(TipoPago, tipo_pago_id, "tipo_pago_id")
@@ -955,11 +958,21 @@ def create_app():
         except LookupError as exc:
             return jsonify({"error": str(exc)}), 404
 
+        total = sum(item["precio"] * item["cantidad"] for item in items)
+        try:
+            saldo = _parse_precio(saldo_val, "saldo") if "saldo" in data else None
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        if saldo is None:
+            saldo = total
+
         orden = Orden(
             fecha=fecha,
             tipo_pago_id=tipo_pago_id,
             estado_id=estado_id,
             cliente_id=cliente_id,
+            total=total,
+            saldo=saldo,
         )
         db.session.add(orden)
         db.session.flush()
@@ -1032,6 +1045,15 @@ def create_app():
                         cantidad=item["cantidad"],
                     )
                 )
+            orden.total = sum(
+                item["precio"] * item["cantidad"] for item in nuevos_items
+            )
+
+        if "saldo" in data:
+            try:
+                orden.saldo = _parse_precio(data.get("saldo"), "saldo") or 0
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
 
         db.session.commit()
         return jsonify(orden_to_dict(orden))
