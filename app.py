@@ -584,6 +584,48 @@ def create_app():
     @app.route("/bancos/<int:banco_id>", methods=["DELETE"])
     def eliminar_banco(banco_id: int):
         pago = Bancos.query.get_or_404(banco_id)
+        if pago.asignado:
+            cliente = Cliente.query.get(pago.cliente_id)
+            if not cliente:
+                return jsonify({"error": "Cliente no encontrado"}), 404
+            if pago.monto is None or pago.monto <= 0:
+                return jsonify({"error": "El monto del banco debe ser mayor que cero"}), 400
+
+            today = date.today()
+
+            def _dias_restantes(orden: Orden) -> int:
+                dias_credito = _dias_credito_from_tipo_pago(orden.tipo_pago)
+                fecha_base = orden.fecha or today
+                vencimiento = fecha_base + timedelta(days=dias_credito)
+                return (vencimiento - today).days
+
+            ordenes = Orden.query.filter_by(cliente_id=cliente.id).all()
+            ordenes_ordenadas = sorted(
+                ordenes,
+                key=lambda orden: (
+                    _dias_restantes(orden),
+                    orden.fecha or date.min,
+                    orden.id,
+                ),
+            )
+
+            restante = Decimal(pago.monto)
+            for orden in ordenes_ordenadas:
+                if restante <= 0:
+                    break
+                total = Decimal(orden.total)
+                saldo_actual = Decimal(orden.saldo)
+                pagado = total - saldo_actual
+                if pagado <= 0:
+                    continue
+                revertir = pagado if pagado <= restante else restante
+                orden.saldo = saldo_actual + revertir
+                if orden.estado_id == 4:
+                    orden.estado_id = 3
+                restante -= revertir
+
+            cliente.saldo = (cliente.saldo or 0) + Decimal(pago.monto)
+
         db.session.delete(pago)
         db.session.commit()
         return jsonify({"message": "Pago eliminado"})
@@ -660,7 +702,8 @@ def create_app():
 
         banco.asignado = True
         banco.cliente_id = cliente_id
-        cliente.saldo = (cliente.saldo or 0) - (Decimal(banco.monto) - restante)
+        # Permite saldo a favor en el mismo campo cuando el abono excede el saldo total.
+        cliente.saldo = (cliente.saldo or 0) - Decimal(banco.monto)
 
         db.session.commit()
         return (
