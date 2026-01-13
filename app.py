@@ -1244,6 +1244,19 @@ def create_app():
                 return jsonify({"error": str(exc)}), 404
             orden.estado_id = data.get("estado_id")
 
+        if "codigo_orden" in data:
+            codigo_orden = (data.get("codigo_orden") or "").strip()
+            if not codigo_orden:
+                return jsonify({"error": "El codigo_orden es requerido"}), 400
+            conflicto = (
+                Orden.query.filter_by(codigo_orden=codigo_orden)
+                .filter(Orden.id != orden.id)
+                .first()
+            )
+            if conflicto:
+                return jsonify({"error": "Ya existe una orden con ese codigo_orden"}), 409
+            orden.codigo_orden = codigo_orden
+
         if "cliente_id" in data:
             try:
                 _validate_fk(Cliente, data.get("cliente_id"), "cliente_id")
