@@ -1062,6 +1062,7 @@ def create_app():
     def orden_to_dict(orden: Orden) -> dict:
         return {
             "id": orden.id,
+            "codigo_orden": orden.codigo_orden,
             "fecha": orden.fecha.isoformat() if orden.fecha else None,
             "usuario_id": orden.usuario_id,
             "tipo_pago_id": orden.tipo_pago_id,
@@ -1120,6 +1121,14 @@ def create_app():
             )
         return parsed_items
 
+    def _generar_codigo_orden(cliente_codigo: str) -> str:
+        ts = int(datetime.utcnow().timestamp())
+        codigo = f"{cliente_codigo}-{ts}"
+        while Orden.query.filter_by(codigo_orden=codigo).first():
+            ts += 1
+            codigo = f"{cliente_codigo}-{ts}"
+        return codigo
+
     @app.route("/ordenes", methods=["GET"])
     def listar_ordenes():
         ordenes = Orden.query.order_by(Orden.id).all()
@@ -1149,7 +1158,7 @@ def create_app():
                 _validate_fk(Usuario, usuario_id, "usuario_id")
             _validate_fk(TipoPago, tipo_pago_id, "tipo_pago_id")
             _validate_fk(EstadoOrden, estado_id, "estado_id")
-            _validate_fk(Cliente, cliente_id, "cliente_id")
+            cliente = _validate_fk(Cliente, cliente_id, "cliente_id")
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
         except LookupError as exc:
@@ -1171,6 +1180,7 @@ def create_app():
             saldo = total
 
         orden = Orden(
+            codigo_orden=_generar_codigo_orden(cliente.codigo.strip()),
             fecha=fecha,
             usuario_id=usuario_id,
             tipo_pago_id=tipo_pago_id,

@@ -192,6 +192,7 @@ class Orden(db.Model):
     __tablename__ = "ordenes"
 
     id = db.Column(db.Integer, primary_key=True)
+    codigo_orden = db.Column(db.String(100), unique=True)
     fecha = db.Column(db.Date, default=datetime.utcnow, nullable=False)
     usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"))
     tipo_pago_id = db.Column(db.Integer, db.ForeignKey("tipos_pago.id"), nullable=False)
