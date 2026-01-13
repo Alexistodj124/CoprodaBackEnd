@@ -60,6 +60,7 @@ class Cliente(db.Model):
     clasificacion_precio = db.Column(db.String(20), nullable=False, default="cf")
     saldo = db.Column(Numeric(12, 2), default=0, nullable=False)
     activo = db.Column(db.Boolean, default=True, nullable=False)
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=True)
     creado_en = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     actualizado_en = db.Column(
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
@@ -67,6 +68,7 @@ class Cliente(db.Model):
 
     ordenes = db.relationship("Orden", back_populates="cliente", lazy="dynamic")
     pagos_banco = db.relationship("Bancos", back_populates="cliente", lazy="dynamic")
+    usuario = db.relationship("Usuario", back_populates="clientes")
 
     def __repr__(self) -> str:
         return f"<Cliente {self.codigo}>"
@@ -120,6 +122,7 @@ class Usuario(db.Model):
         lazy="dynamic",
     )
     ordenes = db.relationship("Orden", back_populates="usuario", lazy="dynamic")
+    clientes = db.relationship("Cliente", back_populates="usuario", lazy="dynamic")
 
     def set_password(self, password: str) -> None:
         self.contrasena = generate_password_hash(password)

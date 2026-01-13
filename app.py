@@ -306,6 +306,7 @@ def create_app():
             "clasificacion_precio": cliente.clasificacion_precio,
             "saldo": float(cliente.saldo),
             "activo": cliente.activo,
+            "usuario_id": cliente.usuario_id,
             "creado_en": cliente.creado_en.isoformat() if cliente.creado_en else None,
             "actualizado_en": cliente.actualizado_en.isoformat()
             if cliente.actualizado_en
@@ -332,6 +333,7 @@ def create_app():
         clasificacion_precio = (data.get("clasificacion_precio") or "cf").strip().lower()
         saldo_val = data.get("saldo", 0)
         activo = _parse_bool(data.get("activo"), default=True)
+        usuario_id = data.get("usuario_id")
 
         if not codigo:
             return jsonify({"error": "El código es requerido"}), 400
@@ -352,8 +354,11 @@ def create_app():
 
         try:
             saldo = _parse_precio(saldo_val, "saldo") or 0
+            _validate_fk(Usuario, usuario_id, "usuario_id")
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
+        except LookupError as exc:
+            return jsonify({"error": str(exc)}), 404
 
         cliente = Cliente(
             codigo=codigo,
@@ -363,6 +368,7 @@ def create_app():
             clasificacion_precio=clasificacion_precio,
             saldo=saldo,
             activo=activo,
+            usuario_id=usuario_id,
         )
         db.session.add(cliente)
         db.session.commit()
@@ -419,6 +425,15 @@ def create_app():
 
         if "activo" in data:
             cliente.activo = _parse_bool(data.get("activo"), default=cliente.activo)
+
+        if "usuario_id" in data:
+            try:
+                _validate_fk(Usuario, data.get("usuario_id"), "usuario_id")
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
+            except LookupError as exc:
+                return jsonify({"error": str(exc)}), 404
+            cliente.usuario_id = data.get("usuario_id")
 
         db.session.commit()
         return jsonify(cliente_to_dict(cliente))
