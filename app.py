@@ -1307,6 +1307,7 @@ def create_app():
             cliente = Cliente.query.get(orden.cliente_id)
             if cliente:
                 cliente.saldo = (cliente.saldo or 0) + Decimal(orden.saldo)
+            orden.fecha = date.today()
 
         db.session.commit()
         return jsonify(orden_to_dict(orden))
