@@ -1329,6 +1329,21 @@ def create_app():
     @app.route("/ordenes/<int:orden_id>", methods=["DELETE"])
     def eliminar_orden(orden_id: int):
         orden = Orden.query.get_or_404(orden_id)
+        total = Decimal(orden.total)
+        saldo = Decimal(orden.saldo)
+        if total != saldo:
+            return (
+                jsonify(
+                    {
+                        "error": "No se puede eliminar la orden porque tiene pagos aplicados"
+                    }
+                ),
+                400,
+            )
+        if orden.estado_id == 3 and orden.cliente_id:
+            cliente = Cliente.query.get(orden.cliente_id)
+            if cliente:
+                cliente.saldo = (cliente.saldo or 0) - Decimal(orden.saldo)
         OrdenItem.query.filter_by(orden_id=orden.id).delete()
         db.session.delete(orden)
         db.session.commit()
