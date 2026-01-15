@@ -1064,6 +1064,7 @@ def create_app():
             "id": orden.id,
             "codigo_orden": orden.codigo_orden,
             "fecha": orden.fecha.isoformat() if orden.fecha else None,
+            "fecha_envio": orden.fecha_envio.isoformat() if orden.fecha_envio else None,
             "usuario_id": orden.usuario_id,
             "tipo_pago_id": orden.tipo_pago_id,
             "estado_id": orden.estado_id,
@@ -1144,6 +1145,7 @@ def create_app():
         data = request.get_json(silent=True) or {}
         try:
             fecha = _parse_fecha(data.get("fecha"))
+            fecha_envio = _parse_fecha(data.get("fecha_envio"))
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
 
@@ -1182,6 +1184,7 @@ def create_app():
         orden = Orden(
             codigo_orden=_generar_codigo_orden(cliente.codigo.strip()),
             fecha=fecha,
+            fecha_envio=fecha_envio,
             usuario_id=usuario_id,
             tipo_pago_id=tipo_pago_id,
             estado_id=estado_id,
@@ -1213,6 +1216,12 @@ def create_app():
         if "fecha" in data:
             try:
                 orden.fecha = _parse_fecha(data.get("fecha"))
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
+
+        if "fecha_envio" in data:
+            try:
+                orden.fecha_envio = _parse_fecha(data.get("fecha_envio"))
             except ValueError as exc:
                 return jsonify({"error": str(exc)}), 400
 
