@@ -610,7 +610,7 @@ def create_app():
 
             def _dias_restantes(orden: Orden) -> int:
                 dias_credito = _dias_credito_from_tipo_pago(orden.tipo_pago)
-                fecha_base = orden.fecha or today
+                fecha_base = orden.fecha_envio or orden.fecha or today
                 vencimiento = fecha_base + timedelta(days=dias_credito)
                 return (vencimiento - today).days
 
@@ -619,7 +619,7 @@ def create_app():
                 ordenes,
                 key=lambda orden: (
                     _dias_restantes(orden),
-                    orden.fecha or date.min,
+                    orden.fecha_envio or orden.fecha or date.min,
                     orden.id,
                 ),
             )
@@ -681,13 +681,17 @@ def create_app():
 
         def _dias_restantes(orden: Orden) -> int:
             dias_credito = _dias_credito_from_tipo_pago(orden.tipo_pago)
-            fecha_base = orden.fecha or today
+            fecha_base = orden.fecha_envio or orden.fecha or today
             vencimiento = fecha_base + timedelta(days=dias_credito)
             return (vencimiento - today).days
 
         ordenes_ordenadas = sorted(
             ordenes,
-            key=lambda orden: (_dias_restantes(orden), orden.fecha or date.min, orden.id),
+            key=lambda orden: (
+                _dias_restantes(orden),
+                orden.fecha_envio or orden.fecha or date.min,
+                orden.id,
+            ),
         )
 
         restante = Decimal(banco.monto)
