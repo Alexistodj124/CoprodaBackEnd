@@ -707,6 +707,7 @@ def create_app():
             if nuevo_saldo <= 0:
                 orden.saldo = Decimal("0.00")
                 orden.estado_id = 4
+                orden.fecha_pago = date.today()
             else:
                 orden.saldo = nuevo_saldo
             restante -= aplicar
@@ -1069,6 +1070,7 @@ def create_app():
             "codigo_orden": orden.codigo_orden,
             "fecha": orden.fecha.isoformat() if orden.fecha else None,
             "fecha_envio": orden.fecha_envio.isoformat() if orden.fecha_envio else None,
+            "fecha_pago": orden.fecha_pago.isoformat() if orden.fecha_pago else None,
             "usuario_id": orden.usuario_id,
             "tipo_pago_id": orden.tipo_pago_id,
             "estado_id": orden.estado_id,
@@ -1150,6 +1152,7 @@ def create_app():
         try:
             fecha = _parse_fecha(data.get("fecha"))
             fecha_envio = _parse_fecha(data.get("fecha_envio"))
+            fecha_pago = _parse_fecha(data.get("fecha_pago"))
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
 
@@ -1189,6 +1192,7 @@ def create_app():
             codigo_orden=_generar_codigo_orden(cliente.codigo.strip()),
             fecha=fecha,
             fecha_envio=fecha_envio,
+            fecha_pago=fecha_pago,
             usuario_id=usuario_id,
             tipo_pago_id=tipo_pago_id,
             estado_id=estado_id,
@@ -1226,6 +1230,12 @@ def create_app():
         if "fecha_envio" in data:
             try:
                 orden.fecha_envio = _parse_fecha(data.get("fecha_envio"))
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
+
+        if "fecha_pago" in data:
+            try:
+                orden.fecha_pago = _parse_fecha(data.get("fecha_pago"))
             except ValueError as exc:
                 return jsonify({"error": str(exc)}), 400
 
@@ -1311,7 +1321,7 @@ def create_app():
             cliente = Cliente.query.get(orden.cliente_id)
             if cliente:
                 cliente.saldo = (cliente.saldo or 0) + Decimal(orden.saldo)
-            orden.fecha = date.today()
+            orden.fecha_envio = date.today()            
 
         db.session.commit()
         return jsonify(orden_to_dict(orden))
