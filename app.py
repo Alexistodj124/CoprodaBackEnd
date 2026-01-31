@@ -14,6 +14,7 @@ from models import (
     CategoriaProducto,
     Cliente,
     ConsumoMateriaPrima,
+    ConsumoProductoComponente,
     EstadoOrden,
     MateriaPrima,
     MateriaPrimaAjuste,
@@ -21,6 +22,7 @@ from models import (
     Proceso,
     ProcesoOrden,
     Producto,
+    ProductoComponente,
     ProductoMateriaPrima,
     ProductoProceso,
     TipoPago,
@@ -165,17 +167,14 @@ def create_app():
             "nombre": producto.nombre,
             "foto": producto.foto,
             "codigo": producto.codigo,
-            "sku": producto.sku,
-            "unidad_produccion": producto.unidad_produccion,
-            "lead_time_objetivo_min": producto.lead_time_objetivo_min,
-            "peso_unitario_est": float(producto.peso_unitario_est or 0),
-            "version_bom": producto.version_bom,
-            "notas_produccion": producto.notas_produccion,
             "categoria_id": producto.categoria_id,
             "activo": producto.activo,
             "precio_cf": float(producto.precio_cf),
             "precio_minorista": float(producto.precio_minorista),
             "precio_mayorista": float(producto.precio_mayorista),
+            "stock_actual": float(producto.stock_actual or 0),
+            "stock_reservado": float(producto.stock_reservado or 0),
+            "stock_minimo": float(producto.stock_minimo or 0),
             "creado_en": producto.creado_en.isoformat() if producto.creado_en else None,
             "actualizado_en": producto.actualizado_en.isoformat()
             if producto.actualizado_en
@@ -215,16 +214,9 @@ def create_app():
         data = request.get_json(silent=True) or {}
         nombre = (data.get("nombre") or "").strip()
         codigo = (data.get("codigo") or "").strip()
-        sku = (data.get("sku") or "").strip() or None
         foto = (data.get("foto") or "").strip() or None
         categoria_id = data.get("categoria_id")
         activo = _parse_bool(data.get("activo"), default=True)
-        unidad_produccion = (data.get("unidad_produccion") or "").strip() or None
-        lead_time_objetivo_min = data.get("lead_time_objetivo_min")
-        peso_unitario_est = data.get("peso_unitario_est")
-        version_bom = data.get("version_bom")
-        notas_produccion = (data.get("notas_produccion") or "").strip() or None
-
         if not nombre:
             return jsonify({"error": "El nombre es requerido"}), 400
         if not codigo:
@@ -235,8 +227,6 @@ def create_app():
         conflicto = Producto.query.filter_by(codigo=codigo).first()
         if conflicto:
             return jsonify({"error": "Ya existe un producto con ese código"}), 409
-        if sku and Producto.query.filter_by(sku=sku).first():
-            return jsonify({"error": "Ya existe un producto con ese sku"}), 409
 
         categoria = CategoriaProducto.query.get(categoria_id)
         if not categoria:
@@ -250,6 +240,17 @@ def create_app():
             precio_mayorista = _parse_precio(
                 data.get("precio_mayorista", 0), "precio_mayorista"
             ) or 0
+            stock_actual = _parse_decimal(
+                data.get("stock_actual", 0), "stock_actual", default=Decimal("0")
+            )
+            stock_reservado = _parse_decimal(
+                data.get("stock_reservado", 0),
+                "stock_reservado",
+                default=Decimal("0"),
+            )
+            stock_minimo = _parse_decimal(
+                data.get("stock_minimo", 0), "stock_minimo", default=Decimal("0")
+            )
             peso_unitario_est_val = (
                 _parse_precio(peso_unitario_est, "peso_unitario_est") or 0
             )
@@ -271,6 +272,9 @@ def create_app():
             precio_cf=precio_cf,
             precio_minorista=precio_minorista,
             precio_mayorista=precio_mayorista,
+            stock_actual=stock_actual or 0,
+            stock_reservado=stock_reservado or 0,
+            stock_minimo=stock_minimo or 0,
         )
         db.session.add(producto)
         db.session.commit()
@@ -360,6 +364,18 @@ def create_app():
             if "precio_mayorista" in data:
                 producto.precio_mayorista = _parse_precio(
                     data.get("precio_mayorista"), "precio_mayorista"
+                )
+            if "stock_actual" in data:
+                producto.stock_actual = _parse_decimal(
+                    data.get("stock_actual"), "stock_actual"
+                )
+            if "stock_reservado" in data:
+                producto.stock_reservado = _parse_decimal(
+                    data.get("stock_reservado"), "stock_reservado"
+                )
+            if "stock_minimo" in data:
+                producto.stock_minimo = _parse_decimal(
+                    data.get("stock_minimo"), "stock_minimo"
                 )
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
@@ -1474,6 +1490,20 @@ def create_app():
             else None,
         }
 
+    def producto_componente_to_dict(item: ProductoComponente) -> dict:
+        return {
+            "id": item.id,
+            "producto_id": item.producto_id,
+            "componente_id": item.componente_id,
+            "cantidad_necesaria": float(item.cantidad_necesaria or 0),
+            "merma_estandar": float(item.merma_estandar or 0),
+            "notas": item.notas,
+            "creado_en": item.creado_en.isoformat() if item.creado_en else None,
+            "actualizado_en": item.actualizado_en.isoformat()
+            if item.actualizado_en
+            else None,
+        }
+
     def proceso_to_dict(proceso: Proceso) -> dict:
         return {
             "id": proceso.id,
@@ -1546,6 +1576,26 @@ def create_app():
             else None,
         }
 
+    def consumo_componente_to_dict(item: ConsumoProductoComponente) -> dict:
+        return {
+            "id": item.id,
+            "orden_produccion_id": item.orden_produccion_id,
+            "proceso_orden_id": item.proceso_orden_id,
+            "componente_id": item.componente_id,
+            "cantidad_teorica": float(item.cantidad_teorica or 0),
+            "cantidad_real": float(item.cantidad_real or 0)
+            if item.cantidad_real is not None
+            else None,
+            "desperdicio": float(item.desperdicio or 0)
+            if item.desperdicio is not None
+            else None,
+            "observaciones": item.observaciones,
+            "creado_en": item.creado_en.isoformat() if item.creado_en else None,
+            "actualizado_en": item.actualizado_en.isoformat()
+            if item.actualizado_en
+            else None,
+        }
+
     def orden_produccion_to_dict(orden: OrdenProduccion, include_detalle=False) -> dict:
         data = {
             "id": orden.id,
@@ -1578,8 +1628,16 @@ def create_app():
                 if hasattr(orden.consumos, "order_by")
                 else orden.consumos
             )
+            consumos_componentes = (
+                orden.consumos_componentes.order_by(ConsumoProductoComponente.id).all()
+                if hasattr(orden.consumos_componentes, "order_by")
+                else orden.consumos_componentes
+            )
             data["procesos"] = [proceso_orden_to_dict(p) for p in procesos]
             data["consumos"] = [consumo_materia_prima_to_dict(c) for c in consumos]
+            data["consumos_componentes"] = [
+                consumo_componente_to_dict(c) for c in consumos_componentes
+            ]
         return data
 
     def ajuste_mp_to_dict(ajuste: MateriaPrimaAjuste) -> dict:
@@ -1604,6 +1662,17 @@ def create_app():
     def _reservado_restante(orden_id: int, materia_prima_id: int):
         consumos = ConsumoMateriaPrima.query.filter_by(
             orden_produccion_id=orden_id, materia_prima_id=materia_prima_id
+        ).all()
+        total_teorico = sum(
+            Decimal(str(c.cantidad_teorica or 0)) for c in consumos
+        )
+        total_real = sum(Decimal(str(c.cantidad_real or 0)) for c in consumos)
+        restante = total_teorico - total_real
+        return restante if restante > 0 else Decimal("0")
+
+    def _reservado_restante_componente(orden_id: int, componente_id: int):
+        consumos = ConsumoProductoComponente.query.filter_by(
+            orden_produccion_id=orden_id, componente_id=componente_id
         ).all()
         total_teorico = sum(
             Decimal(str(c.cantidad_teorica or 0)) for c in consumos
@@ -1858,6 +1927,111 @@ def create_app():
         db.session.commit()
         return jsonify({"message": "BOM eliminado"})
 
+    @app.route("/productos/<int:producto_id>/componentes", methods=["GET"])
+    def listar_componentes_producto(producto_id: int):
+        Producto.query.get_or_404(producto_id)
+        items = ProductoComponente.query.filter_by(producto_id=producto_id).all()
+        return jsonify([producto_componente_to_dict(i) for i in items])
+
+    @app.route("/productos/<int:producto_id>/componentes", methods=["POST"])
+    def crear_componente_producto(producto_id: int):
+        Producto.query.get_or_404(producto_id)
+        data = request.get_json(silent=True) or {}
+        componente_id = data.get("componente_id")
+        if componente_id is None:
+            return jsonify({"error": "componente_id es requerido"}), 400
+        if componente_id == producto_id:
+            return jsonify({"error": "El componente no puede ser el mismo producto"}), 400
+        Producto.query.get_or_404(componente_id)
+
+        existente = ProductoComponente.query.filter_by(
+            producto_id=producto_id, componente_id=componente_id
+        ).first()
+        if existente:
+            return jsonify({"error": "Ya existe ese componente en el producto"}), 409
+
+        try:
+            cantidad_necesaria = _parse_decimal(
+                data.get("cantidad_necesaria"), "cantidad_necesaria"
+            )
+            merma_estandar = _parse_decimal(
+                data.get("merma_estandar", 0), "merma_estandar", default=Decimal("0")
+            )
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        if cantidad_necesaria is None:
+            return jsonify({"error": "cantidad_necesaria es requerida"}), 400
+
+        item = ProductoComponente(
+            producto_id=producto_id,
+            componente_id=componente_id,
+            cantidad_necesaria=cantidad_necesaria,
+            merma_estandar=merma_estandar or 0,
+            notas=(data.get("notas") or "").strip() or None,
+        )
+        db.session.add(item)
+        db.session.commit()
+        return jsonify(producto_componente_to_dict(item)), 201
+
+    @app.route(
+        "/productos/<int:producto_id>/componentes/<int:item_id>",
+        methods=["PUT", "PATCH"],
+    )
+    def actualizar_componente_producto(producto_id: int, item_id: int):
+        item = ProductoComponente.query.filter_by(
+            id=item_id, producto_id=producto_id
+        ).first_or_404()
+        data = request.get_json(silent=True) or {}
+
+        if "componente_id" in data:
+            componente_id = data.get("componente_id")
+            if componente_id == producto_id:
+                return (
+                    jsonify({"error": "El componente no puede ser el mismo producto"}),
+                    400,
+                )
+            Producto.query.get_or_404(componente_id)
+            existente = (
+                ProductoComponente.query.filter_by(
+                    producto_id=producto_id, componente_id=componente_id
+                )
+                .filter(ProductoComponente.id != item.id)
+                .first()
+            )
+            if existente:
+                return jsonify({"error": "Ya existe ese componente en el producto"}), 409
+            item.componente_id = componente_id
+
+        try:
+            if "cantidad_necesaria" in data:
+                item.cantidad_necesaria = _parse_decimal(
+                    data.get("cantidad_necesaria"), "cantidad_necesaria"
+                )
+            if "merma_estandar" in data:
+                item.merma_estandar = _parse_decimal(
+                    data.get("merma_estandar"), "merma_estandar"
+                )
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+        if "notas" in data:
+            item.notas = (data.get("notas") or "").strip() or None
+
+        db.session.commit()
+        return jsonify(producto_componente_to_dict(item))
+
+    @app.route(
+        "/productos/<int:producto_id>/componentes/<int:item_id>",
+        methods=["DELETE"],
+    )
+    def eliminar_componente_producto(producto_id: int, item_id: int):
+        item = ProductoComponente.query.filter_by(
+            id=item_id, producto_id=producto_id
+        ).first_or_404()
+        db.session.delete(item)
+        db.session.commit()
+        return jsonify({"message": "Componente eliminado"})
+
     @app.route("/procesos", methods=["GET"])
     def listar_procesos():
         procesos = Proceso.query.order_by(Proceso.id).all()
@@ -2058,8 +2232,14 @@ def create_app():
             return jsonify({"error": "producto_id no encontrado"}), 404
 
         bom_items = ProductoMateriaPrima.query.filter_by(producto_id=producto_id).all()
-        if not bom_items:
-            return jsonify({"error": "El producto no tiene BOM configurado"}), 400
+        componentes = ProductoComponente.query.filter_by(producto_id=producto_id).all()
+        if not bom_items and not componentes:
+            return (
+                jsonify(
+                    {"error": "El producto no tiene BOM ni componentes configurados"}
+                ),
+                400,
+            )
 
         ruta = (
             ProductoProceso.query.filter_by(producto_id=producto_id, activo=True)
@@ -2089,6 +2269,26 @@ def create_app():
                     400,
                 )
 
+        for item in componentes:
+            componente = Producto.query.get(item.componente_id)
+            if not componente:
+                return jsonify({"error": "Componente no encontrado en producto"}), 404
+            teorico = _calcular_teorico(item, cantidad_planeada)
+            disponible = Decimal(str(componente.stock_actual or 0)) - Decimal(
+                str(componente.stock_reservado or 0)
+            )
+            if disponible < teorico:
+                return (
+                    jsonify(
+                        {
+                            "error": f"Stock insuficiente para {componente.codigo}",
+                            "disponible": float(disponible),
+                            "requerido": float(teorico),
+                        }
+                    ),
+                    400,
+                )
+
         orden = OrdenProduccion(
             codigo=codigo,
             producto_id=producto_id,
@@ -2110,6 +2310,19 @@ def create_app():
             db.session.add(consumo)
             materia = MateriaPrima.query.get(item.materia_prima_id)
             materia.stock_reservado = Decimal(str(materia.stock_reservado or 0)) + teorico
+
+        for item in componentes:
+            teorico = _calcular_teorico(item, cantidad_planeada)
+            consumo = ConsumoProductoComponente(
+                orden_produccion_id=orden.id,
+                componente_id=item.componente_id,
+                cantidad_teorica=teorico,
+            )
+            db.session.add(consumo)
+            componente = Producto.query.get(item.componente_id)
+            componente.stock_reservado = Decimal(
+                str(componente.stock_reservado or 0)
+            ) + teorico
 
         for item in ruta:
             proceso_orden = ProcesoOrden(
@@ -2159,7 +2372,20 @@ def create_app():
                 materia.stock_reservado = max(
                     Decimal(str(materia.stock_reservado or 0)) - restante, Decimal("0")
                 )
+        for consumo in orden.consumos_componentes.all():
+            teorico = Decimal(str(consumo.cantidad_teorica or 0))
+            real = Decimal(str(consumo.cantidad_real or 0))
+            restante = teorico - real
+            if restante > 0:
+                componente = Producto.query.get(consumo.componente_id)
+                componente.stock_reservado = max(
+                    Decimal(str(componente.stock_reservado or 0)) - restante,
+                    Decimal("0"),
+                )
         ConsumoMateriaPrima.query.filter_by(orden_produccion_id=orden.id).delete()
+        ConsumoProductoComponente.query.filter_by(
+            orden_produccion_id=orden.id
+        ).delete()
         ProcesoOrden.query.filter_by(orden_produccion_id=orden.id).delete()
         db.session.delete(orden)
         db.session.commit()
@@ -2201,6 +2427,16 @@ def create_app():
                 materia = MateriaPrima.query.get(consumo.materia_prima_id)
                 materia.stock_reservado = max(
                     Decimal(str(materia.stock_reservado or 0)) - restante, Decimal("0")
+                )
+        for consumo in orden.consumos_componentes.all():
+            teorico = Decimal(str(consumo.cantidad_teorica or 0))
+            real = Decimal(str(consumo.cantidad_real or 0))
+            restante = teorico - real
+            if restante > 0:
+                componente = Producto.query.get(consumo.componente_id)
+                componente.stock_reservado = max(
+                    Decimal(str(componente.stock_reservado or 0)) - restante,
+                    Decimal("0"),
                 )
         db.session.commit()
         return jsonify(orden_produccion_to_dict(orden, include_detalle=True))
@@ -2538,6 +2774,191 @@ def create_app():
             delta_reservado = reservado_after - reservado_before
             materia.stock_reservado = max(
                 Decimal(str(materia.stock_reservado or 0)) + delta_reservado, Decimal("0")
+            )
+
+        db.session.delete(consumo)
+        db.session.commit()
+        return jsonify({"message": "Consumo eliminado"})
+
+    @app.route("/ordenes-produccion/<int:orden_id>/consumos-componentes", methods=["GET"])
+    def listar_consumos_componentes_orden(orden_id: int):
+        OrdenProduccion.query.get_or_404(orden_id)
+        consumos = ConsumoProductoComponente.query.filter_by(
+            orden_produccion_id=orden_id
+        ).all()
+        return jsonify([consumo_componente_to_dict(c) for c in consumos])
+
+    @app.route("/ordenes-produccion/<int:orden_id>/consumos-componentes", methods=["POST"])
+    def crear_consumo_componente_orden(orden_id: int):
+        OrdenProduccion.query.get_or_404(orden_id)
+        data = request.get_json(silent=True) or {}
+        componente_id = data.get("componente_id")
+        if componente_id is None:
+            return jsonify({"error": "componente_id es requerido"}), 400
+        componente = Producto.query.get(componente_id)
+        if not componente:
+            return jsonify({"error": "componente_id no encontrado"}), 404
+
+        proceso_orden_id = data.get("proceso_orden_id")
+        if proceso_orden_id is not None:
+            proceso_orden = ProcesoOrden.query.get(proceso_orden_id)
+            if not proceso_orden or proceso_orden.orden_produccion_id != orden_id:
+                return jsonify({"error": "proceso_orden_id inválido"}), 400
+
+        try:
+            cantidad_real = _parse_decimal(
+                data.get("cantidad_real"), "cantidad_real"
+            )
+            cantidad_teorica = _parse_decimal(
+                data.get("cantidad_teorica", 0),
+                "cantidad_teorica",
+                default=Decimal("0"),
+            )
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+        if cantidad_real is None or cantidad_real <= 0:
+            return jsonify({"error": "cantidad_real debe ser mayor que cero"}), 400
+
+        disponible = Decimal(str(componente.stock_actual or 0))
+        if disponible < cantidad_real:
+            return jsonify({"error": "Stock insuficiente"}), 400
+
+        restante = _reservado_restante_componente(orden_id, componente_id)
+
+        consumo = ConsumoProductoComponente(
+            orden_produccion_id=orden_id,
+            proceso_orden_id=proceso_orden_id,
+            componente_id=componente_id,
+            cantidad_teorica=cantidad_teorica or 0,
+            cantidad_real=cantidad_real,
+            desperdicio=(cantidad_real - (cantidad_teorica or 0)),
+            observaciones=(data.get("observaciones") or "").strip() or None,
+        )
+        db.session.add(consumo)
+
+        componente.stock_actual = disponible - cantidad_real
+        liberar = cantidad_real if cantidad_real <= restante else restante
+        componente.stock_reservado = max(
+            Decimal(str(componente.stock_reservado or 0)) - liberar, Decimal("0")
+        )
+
+        db.session.commit()
+        return jsonify(consumo_componente_to_dict(consumo)), 201
+
+    @app.route(
+        "/ordenes-produccion/<int:orden_id>/consumos-componentes/<int:consumo_id>",
+        methods=["PUT", "PATCH"],
+    )
+    def actualizar_consumo_componente_orden(orden_id: int, consumo_id: int):
+        consumo = ConsumoProductoComponente.query.get_or_404(consumo_id)
+        if consumo.orden_produccion_id != orden_id:
+            return jsonify({"error": "Consumo no pertenece a la orden"}), 400
+        data = request.get_json(silent=True) or {}
+
+        if "proceso_orden_id" in data:
+            proceso_orden_id = data.get("proceso_orden_id")
+            if proceso_orden_id is not None:
+                proceso_orden = ProcesoOrden.query.get(proceso_orden_id)
+                if not proceso_orden or proceso_orden.orden_produccion_id != orden_id:
+                    return jsonify({"error": "proceso_orden_id inválido"}), 400
+            consumo.proceso_orden_id = proceso_orden_id
+
+        old_real = Decimal(str(consumo.cantidad_real or 0))
+        old_teorico = Decimal(str(consumo.cantidad_teorica or 0))
+
+        new_teorico = old_teorico
+        new_real = old_real
+        try:
+            if "cantidad_teorica" in data:
+                parsed = _parse_decimal(data.get("cantidad_teorica"), "cantidad_teorica")
+                new_teorico = Decimal(str(parsed or 0))
+            if "cantidad_real" in data:
+                parsed = _parse_decimal(data.get("cantidad_real"), "cantidad_real")
+                new_real = Decimal(str(parsed or 0))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+        componente = Producto.query.get(consumo.componente_id)
+        total_teorico = sum(
+            Decimal(str(c.cantidad_teorica or 0))
+            for c in ConsumoProductoComponente.query.filter_by(
+                orden_produccion_id=orden_id, componente_id=consumo.componente_id
+            ).all()
+        )
+        total_real = sum(
+            Decimal(str(c.cantidad_real or 0))
+            for c in ConsumoProductoComponente.query.filter_by(
+                orden_produccion_id=orden_id, componente_id=consumo.componente_id
+            ).all()
+        )
+        total_teorico_after = total_teorico - old_teorico + new_teorico
+        total_real_after = total_real - old_real + new_real
+
+        delta_real = new_real - old_real
+        if delta_real != 0:
+            disponible = Decimal(str(componente.stock_actual or 0))
+            if delta_real > 0 and disponible < delta_real:
+                return jsonify({"error": "Stock insuficiente"}), 400
+            componente.stock_actual = disponible - delta_real
+
+        reservado_before = total_teorico - total_real
+        reservado_before = reservado_before if reservado_before > 0 else Decimal("0")
+        reservado_after = total_teorico_after - total_real_after
+        reservado_after = reservado_after if reservado_after > 0 else Decimal("0")
+        delta_reservado = reservado_after - reservado_before
+        if delta_reservado != 0:
+            componente.stock_reservado = max(
+                Decimal(str(componente.stock_reservado or 0)) + delta_reservado,
+                Decimal("0"),
+            )
+
+        consumo.cantidad_teorica = new_teorico
+        consumo.cantidad_real = new_real
+        consumo.desperdicio = new_real - new_teorico
+
+        if "observaciones" in data:
+            consumo.observaciones = (data.get("observaciones") or "").strip() or None
+
+        db.session.commit()
+        return jsonify(consumo_componente_to_dict(consumo))
+
+    @app.route(
+        "/ordenes-produccion/<int:orden_id>/consumos-componentes/<int:consumo_id>",
+        methods=["DELETE"],
+    )
+    def eliminar_consumo_componente_orden(orden_id: int, consumo_id: int):
+        consumo = ConsumoProductoComponente.query.get_or_404(consumo_id)
+        if consumo.orden_produccion_id != orden_id:
+            return jsonify({"error": "Consumo no pertenece a la orden"}), 400
+
+        componente = Producto.query.get(consumo.componente_id)
+        old_real = Decimal(str(consumo.cantidad_real or 0))
+        if old_real > 0:
+            componente.stock_actual = Decimal(str(componente.stock_actual or 0)) + old_real
+
+            total_teorico = sum(
+                Decimal(str(c.cantidad_teorica or 0))
+                for c in ConsumoProductoComponente.query.filter_by(
+                    orden_produccion_id=orden_id,
+                    componente_id=consumo.componente_id,
+                ).all()
+            )
+            total_real = sum(
+                Decimal(str(c.cantidad_real or 0))
+                for c in ConsumoProductoComponente.query.filter_by(
+                    orden_produccion_id=orden_id,
+                    componente_id=consumo.componente_id,
+                ).all()
+            )
+            reservado_before = total_teorico - total_real
+            reservado_before = reservado_before if reservado_before > 0 else Decimal("0")
+            reservado_after = total_teorico - (total_real - old_real)
+            reservado_after = reservado_after if reservado_after > 0 else Decimal("0")
+            delta_reservado = reservado_after - reservado_before
+            componente.stock_reservado = max(
+                Decimal(str(componente.stock_reservado or 0)) + delta_reservado,
+                Decimal("0"),
             )
 
         db.session.delete(consumo)

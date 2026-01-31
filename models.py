@@ -35,15 +35,12 @@ class Producto(db.Model):
         db.Integer, db.ForeignKey("categorias_producto.id"), nullable=False
     )
     activo = db.Column(db.Boolean, default=True, nullable=False)
-    sku = db.Column(db.String(80), unique=True, index=True)
-    unidad_produccion = db.Column(db.String(50))
-    lead_time_objetivo_min = db.Column(db.Integer)
-    peso_unitario_est = db.Column(Numeric(12, 4), default=0, nullable=False)
-    version_bom = db.Column(db.Integer, default=1, nullable=False)
-    notas_produccion = db.Column(db.Text)
     precio_cf = db.Column(Numeric(12, 2), default=0, nullable=False)
     precio_minorista = db.Column(Numeric(12, 2), default=0, nullable=False)
     precio_mayorista = db.Column(Numeric(12, 2), default=0, nullable=False)
+    stock_actual = db.Column(Numeric(12, 4), default=0, nullable=False)
+    stock_reservado = db.Column(Numeric(12, 4), default=0, nullable=False)
+    stock_minimo = db.Column(Numeric(12, 4), default=0, nullable=False)
     creado_en = db.Column(db.DateTime, default=datetime.utcnow, nullable=False). nm,
     actualizado_en = db.Column(
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
@@ -52,6 +49,21 @@ class Producto(db.Model):
     categoria = db.relationship("CategoriaProducto", back_populates="productos")
     bom_items = db.relationship(
         "ProductoMateriaPrima", back_populates="producto", lazy="dynamic"
+    )
+    componentes = db.relationship(
+        "ProductoComponente",
+        foreign_keys="ProductoComponente.producto_id",
+        back_populates="producto",
+        lazy="dynamic",
+    )
+    usado_en_componentes = db.relationship(
+        "ProductoComponente",
+        foreign_keys="ProductoComponente.componente_id",
+        back_populates="componente",
+        lazy="dynamic",
+    )
+    consumos_componentes = db.relationship(
+        "ConsumoProductoComponente", back_populates="componente", lazy="dynamic"
     )
     ruta_procesos = db.relationship(
         "ProductoProceso", back_populates="producto", lazy="dynamic"
@@ -311,6 +323,36 @@ class ProductoMateriaPrima(db.Model):
         return f"<ProductoMateriaPrima {self.producto_id}-{self.materia_prima_id}>"
 
 
+class ProductoComponente(db.Model):
+    __tablename__ = "productos_componentes"
+    __table_args__ = (
+        db.UniqueConstraint(
+            "producto_id", "componente_id", name="uq_producto_componente"
+        ),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    producto_id = db.Column(db.Integer, db.ForeignKey("productos.id"), nullable=False)
+    componente_id = db.Column(db.Integer, db.ForeignKey("productos.id"), nullable=False)
+    cantidad_necesaria = db.Column(Numeric(12, 4), nullable=False, default=0)
+    merma_estandar = db.Column(Numeric(12, 4), default=0, nullable=False)
+    notas = db.Column(db.Text)
+    creado_en = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    actualizado_en = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    producto = db.relationship(
+        "Producto", foreign_keys=[producto_id], back_populates="componentes"
+    )
+    componente = db.relationship(
+        "Producto", foreign_keys=[componente_id], back_populates="usado_en_componentes"
+    )
+
+    def __repr__(self) -> str:
+        return f"<ProductoComponente {self.producto_id}-{self.componente_id}>"
+
+
 class Proceso(db.Model):
     __tablename__ = "procesos"
 
@@ -386,6 +428,9 @@ class OrdenProduccion(db.Model):
     consumos = db.relationship(
         "ConsumoMateriaPrima", back_populates="orden_produccion", lazy="dynamic"
     )
+    consumos_componentes = db.relationship(
+        "ConsumoProductoComponente", back_populates="orden_produccion", lazy="dynamic"
+    )
 
     def __repr__(self) -> str:
         return f"<OrdenProduccion {self.codigo}>"
@@ -425,6 +470,9 @@ class ProcesoOrden(db.Model):
     consumos = db.relationship(
         "ConsumoMateriaPrima", back_populates="proceso_orden", lazy="dynamic"
     )
+    consumos_componentes = db.relationship(
+        "ConsumoProductoComponente", back_populates="proceso_orden", lazy="dynamic"
+    )
 
     def __repr__(self) -> str:
         return f"<ProcesoOrden {self.orden_produccion_id}-{self.orden}>"
@@ -458,6 +506,38 @@ class ConsumoMateriaPrima(db.Model):
 
     def __repr__(self) -> str:
         return f"<ConsumoMateriaPrima {self.id} Orden {self.orden_produccion_id}>"
+
+
+class ConsumoProductoComponente(db.Model):
+    __tablename__ = "consumos_componentes_producto"
+
+    id = db.Column(db.Integer, primary_key=True)
+    orden_produccion_id = db.Column(
+        db.Integer, db.ForeignKey("ordenes_produccion.id"), nullable=False
+    )
+    proceso_orden_id = db.Column(db.Integer, db.ForeignKey("procesos_orden.id"))
+    componente_id = db.Column(db.Integer, db.ForeignKey("productos.id"), nullable=False)
+    cantidad_teorica = db.Column(Numeric(12, 4), default=0, nullable=False)
+    cantidad_real = db.Column(Numeric(12, 4))
+    desperdicio = db.Column(Numeric(12, 4))
+    observaciones = db.Column(db.Text)
+    creado_en = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    actualizado_en = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    orden_produccion = db.relationship(
+        "OrdenProduccion", back_populates="consumos_componentes"
+    )
+    proceso_orden = db.relationship(
+        "ProcesoOrden", back_populates="consumos_componentes"
+    )
+    componente = db.relationship(
+        "Producto", back_populates="consumos_componentes"
+    )
+
+    def __repr__(self) -> str:
+        return f"<ConsumoProductoComponente {self.id} Orden {self.orden_produccion_id}>"
 
 
 class MateriaPrimaAjuste(db.Model):
