@@ -13,11 +13,19 @@ from models import (
     Bancos,
     CategoriaProducto,
     Cliente,
+    ConsumoMateriaPrima,
     EstadoOrden,
+    MateriaPrima,
+    MateriaPrimaAjuste,
     Permiso,
+    Proceso,
+    ProcesoOrden,
     Producto,
+    ProductoMateriaPrima,
+    ProductoProceso,
     TipoPago,
     Usuario,
+    OrdenProduccion,
     Orden,
     OrdenItem,
     db,
@@ -157,6 +165,12 @@ def create_app():
             "nombre": producto.nombre,
             "foto": producto.foto,
             "codigo": producto.codigo,
+            "sku": producto.sku,
+            "unidad_produccion": producto.unidad_produccion,
+            "lead_time_objetivo_min": producto.lead_time_objetivo_min,
+            "peso_unitario_est": float(producto.peso_unitario_est or 0),
+            "version_bom": producto.version_bom,
+            "notas_produccion": producto.notas_produccion,
             "categoria_id": producto.categoria_id,
             "activo": producto.activo,
             "precio_cf": float(producto.precio_cf),
@@ -186,14 +200,30 @@ def create_app():
         except (TypeError, ValueError):
             raise ValueError(f"El campo {field_name} debe ser numérico")
 
+    def _parse_decimal(value, field_name: str, default=None):
+        if value is None:
+            return default
+        if isinstance(value, str) and not value.strip():
+            return default
+        try:
+            return Decimal(str(value))
+        except (TypeError, ValueError):
+            raise ValueError(f"El campo {field_name} debe ser numérico")
+
     @app.route("/productos", methods=["POST"])
     def crear_producto():
         data = request.get_json(silent=True) or {}
         nombre = (data.get("nombre") or "").strip()
         codigo = (data.get("codigo") or "").strip()
+        sku = (data.get("sku") or "").strip() or None
         foto = (data.get("foto") or "").strip() or None
         categoria_id = data.get("categoria_id")
         activo = _parse_bool(data.get("activo"), default=True)
+        unidad_produccion = (data.get("unidad_produccion") or "").strip() or None
+        lead_time_objetivo_min = data.get("lead_time_objetivo_min")
+        peso_unitario_est = data.get("peso_unitario_est")
+        version_bom = data.get("version_bom")
+        notas_produccion = (data.get("notas_produccion") or "").strip() or None
 
         if not nombre:
             return jsonify({"error": "El nombre es requerido"}), 400
@@ -205,6 +235,8 @@ def create_app():
         conflicto = Producto.query.filter_by(codigo=codigo).first()
         if conflicto:
             return jsonify({"error": "Ya existe un producto con ese código"}), 409
+        if sku and Producto.query.filter_by(sku=sku).first():
+            return jsonify({"error": "Ya existe un producto con ese sku"}), 409
 
         categoria = CategoriaProducto.query.get(categoria_id)
         if not categoria:
@@ -218,15 +250,24 @@ def create_app():
             precio_mayorista = _parse_precio(
                 data.get("precio_mayorista", 0), "precio_mayorista"
             ) or 0
+            peso_unitario_est_val = (
+                _parse_precio(peso_unitario_est, "peso_unitario_est") or 0
+            )
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
 
         producto = Producto(
             nombre=nombre,
             codigo=codigo,
+            sku=sku,
             foto=foto,
             categoria_id=categoria_id,
             activo=activo,
+            unidad_produccion=unidad_produccion,
+            lead_time_objetivo_min=lead_time_objetivo_min,
+            peso_unitario_est=peso_unitario_est_val,
+            version_bom=version_bom or 1,
+            notas_produccion=notas_produccion,
             precio_cf=precio_cf,
             precio_minorista=precio_minorista,
             precio_mayorista=precio_mayorista,
@@ -259,6 +300,18 @@ def create_app():
                 return jsonify({"error": "Ya existe un producto con ese código"}), 409
             producto.codigo = codigo
 
+        if "sku" in data:
+            sku = (data.get("sku") or "").strip() or None
+            if sku:
+                conflicto = (
+                    Producto.query.filter_by(sku=sku)
+                    .filter(Producto.id != producto.id)
+                    .first()
+                )
+                if conflicto:
+                    return jsonify({"error": "Ya existe un producto con ese sku"}), 409
+            producto.sku = sku
+
         if "foto" in data:
             producto.foto = (data.get("foto") or "").strip() or None
 
@@ -271,6 +324,31 @@ def create_app():
 
         if "activo" in data:
             producto.activo = _parse_bool(data.get("activo"), default=producto.activo)
+
+        if "unidad_produccion" in data:
+            producto.unidad_produccion = (
+                (data.get("unidad_produccion") or "").strip() or None
+            )
+
+        if "lead_time_objetivo_min" in data:
+            producto.lead_time_objetivo_min = data.get("lead_time_objetivo_min")
+
+        if "peso_unitario_est" in data:
+            try:
+                producto.peso_unitario_est = (
+                    _parse_precio(data.get("peso_unitario_est"), "peso_unitario_est")
+                    or 0
+                )
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
+
+        if "version_bom" in data:
+            producto.version_bom = data.get("version_bom") or producto.version_bom
+
+        if "notas_produccion" in data:
+            producto.notas_produccion = (
+                (data.get("notas_produccion") or "").strip() or None
+            )
 
         try:
             if "precio_cf" in data:
@@ -456,6 +534,18 @@ def create_app():
             return value
         except (ValueError, TypeError):
             raise ValueError("El formato de fecha debe ser YYYY-MM-DD")
+
+    def _parse_datetime(value, field_name: str):
+        if value is None:
+            return None
+        if isinstance(value, str) and not value.strip():
+            return None
+        try:
+            if isinstance(value, str):
+                return datetime.fromisoformat(value)
+            return value
+        except (ValueError, TypeError):
+            raise ValueError(f"El campo {field_name} debe ser datetime ISO")
 
     def _parse_bool(value, default=None):
         if value is None:
@@ -1348,6 +1438,1246 @@ def create_app():
         db.session.delete(orden)
         db.session.commit()
         return jsonify({"message": "Orden eliminada"})
+
+    # ---------- PRODUCCION ----------
+
+    def materia_prima_to_dict(materia_prima: MateriaPrima) -> dict:
+        return {
+            "id": materia_prima.id,
+            "nombre": materia_prima.nombre,
+            "codigo": materia_prima.codigo,
+            "unidad": materia_prima.unidad,
+            "costo_unitario": float(materia_prima.costo_unitario or 0),
+            "stock_actual": float(materia_prima.stock_actual or 0),
+            "stock_reservado": float(materia_prima.stock_reservado or 0),
+            "stock_minimo": float(materia_prima.stock_minimo or 0),
+            "activo": materia_prima.activo,
+            "creado_en": materia_prima.creado_en.isoformat()
+            if materia_prima.creado_en
+            else None,
+            "actualizado_en": materia_prima.actualizado_en.isoformat()
+            if materia_prima.actualizado_en
+            else None,
+        }
+
+    def producto_materia_prima_to_dict(item: ProductoMateriaPrima) -> dict:
+        return {
+            "id": item.id,
+            "producto_id": item.producto_id,
+            "materia_prima_id": item.materia_prima_id,
+            "cantidad_necesaria": float(item.cantidad_necesaria or 0),
+            "merma_estandar": float(item.merma_estandar or 0),
+            "notas": item.notas,
+            "creado_en": item.creado_en.isoformat() if item.creado_en else None,
+            "actualizado_en": item.actualizado_en.isoformat()
+            if item.actualizado_en
+            else None,
+        }
+
+    def proceso_to_dict(proceso: Proceso) -> dict:
+        return {
+            "id": proceso.id,
+            "nombre": proceso.nombre,
+            "descripcion": proceso.descripcion,
+            "activo": proceso.activo,
+            "creado_en": proceso.creado_en.isoformat() if proceso.creado_en else None,
+            "actualizado_en": proceso.actualizado_en.isoformat()
+            if proceso.actualizado_en
+            else None,
+        }
+
+    def producto_proceso_to_dict(item: ProductoProceso) -> dict:
+        return {
+            "id": item.id,
+            "producto_id": item.producto_id,
+            "proceso_id": item.proceso_id,
+            "orden": item.orden,
+            "tiempo_objetivo_min": item.tiempo_objetivo_min,
+            "activo": item.activo,
+            "creado_en": item.creado_en.isoformat() if item.creado_en else None,
+            "actualizado_en": item.actualizado_en.isoformat()
+            if item.actualizado_en
+            else None,
+        }
+
+    def proceso_orden_to_dict(item: ProcesoOrden) -> dict:
+        return {
+            "id": item.id,
+            "orden_produccion_id": item.orden_produccion_id,
+            "proceso_id": item.proceso_id,
+            "orden": item.orden,
+            "estado": item.estado,
+            "inicio": item.inicio.isoformat() if item.inicio else None,
+            "fin": item.fin.isoformat() if item.fin else None,
+            "cantidad_entrada": float(item.cantidad_entrada or 0)
+            if item.cantidad_entrada is not None
+            else None,
+            "cantidad_salida": float(item.cantidad_salida or 0)
+            if item.cantidad_salida is not None
+            else None,
+            "cantidad_perdida": float(item.cantidad_perdida or 0)
+            if item.cantidad_perdida is not None
+            else None,
+            "motivo_perdida": item.motivo_perdida,
+            "observaciones": item.observaciones,
+            "creado_en": item.creado_en.isoformat() if item.creado_en else None,
+            "actualizado_en": item.actualizado_en.isoformat()
+            if item.actualizado_en
+            else None,
+        }
+
+    def consumo_materia_prima_to_dict(item: ConsumoMateriaPrima) -> dict:
+        return {
+            "id": item.id,
+            "orden_produccion_id": item.orden_produccion_id,
+            "proceso_orden_id": item.proceso_orden_id,
+            "materia_prima_id": item.materia_prima_id,
+            "cantidad_teorica": float(item.cantidad_teorica or 0),
+            "cantidad_real": float(item.cantidad_real or 0)
+            if item.cantidad_real is not None
+            else None,
+            "desperdicio": float(item.desperdicio or 0)
+            if item.desperdicio is not None
+            else None,
+            "observaciones": item.observaciones,
+            "creado_en": item.creado_en.isoformat() if item.creado_en else None,
+            "actualizado_en": item.actualizado_en.isoformat()
+            if item.actualizado_en
+            else None,
+        }
+
+    def orden_produccion_to_dict(orden: OrdenProduccion, include_detalle=False) -> dict:
+        data = {
+            "id": orden.id,
+            "codigo": orden.codigo,
+            "producto_id": orden.producto_id,
+            "cantidad_planeada": float(orden.cantidad_planeada or 0),
+            "cantidad_final_buena": float(orden.cantidad_final_buena or 0)
+            if orden.cantidad_final_buena is not None
+            else None,
+            "estado": orden.estado,
+            "fecha_inicio": orden.fecha_inicio.isoformat()
+            if orden.fecha_inicio
+            else None,
+            "fecha_fin": orden.fecha_fin.isoformat() if orden.fecha_fin else None,
+            "prioridad": orden.prioridad,
+            "notas": orden.notas,
+            "creado_en": orden.creado_en.isoformat() if orden.creado_en else None,
+            "actualizado_en": orden.actualizado_en.isoformat()
+            if orden.actualizado_en
+            else None,
+        }
+        if include_detalle:
+            procesos = (
+                orden.procesos.order_by(ProcesoOrden.orden).all()
+                if hasattr(orden.procesos, "order_by")
+                else orden.procesos
+            )
+            consumos = (
+                orden.consumos.order_by(ConsumoMateriaPrima.id).all()
+                if hasattr(orden.consumos, "order_by")
+                else orden.consumos
+            )
+            data["procesos"] = [proceso_orden_to_dict(p) for p in procesos]
+            data["consumos"] = [consumo_materia_prima_to_dict(c) for c in consumos]
+        return data
+
+    def ajuste_mp_to_dict(ajuste: MateriaPrimaAjuste) -> dict:
+        return {
+            "id": ajuste.id,
+            "materia_prima_id": ajuste.materia_prima_id,
+            "tipo": ajuste.tipo,
+            "cantidad": float(ajuste.cantidad or 0),
+            "motivo": ajuste.motivo,
+            "observaciones": ajuste.observaciones,
+            "creado_en": ajuste.creado_en.isoformat() if ajuste.creado_en else None,
+            "actualizado_en": ajuste.actualizado_en.isoformat()
+            if ajuste.actualizado_en
+            else None,
+        }
+
+    def _calcular_teorico(bom_item: ProductoMateriaPrima, cantidad_planeada: Decimal):
+        cantidad_base = Decimal(str(bom_item.cantidad_necesaria or 0))
+        merma = Decimal(str(bom_item.merma_estandar or 0))
+        return (cantidad_base + merma) * cantidad_planeada
+
+    def _reservado_restante(orden_id: int, materia_prima_id: int):
+        consumos = ConsumoMateriaPrima.query.filter_by(
+            orden_produccion_id=orden_id, materia_prima_id=materia_prima_id
+        ).all()
+        total_teorico = sum(
+            Decimal(str(c.cantidad_teorica or 0)) for c in consumos
+        )
+        total_real = sum(Decimal(str(c.cantidad_real or 0)) for c in consumos)
+        restante = total_teorico - total_real
+        return restante if restante > 0 else Decimal("0")
+
+    @app.route("/materias-primas", methods=["GET"])
+    def listar_materias_primas():
+        materias = MateriaPrima.query.order_by(MateriaPrima.id).all()
+        return jsonify([materia_prima_to_dict(m) for m in materias])
+
+    @app.route("/materias-primas/<int:materia_prima_id>", methods=["GET"])
+    def obtener_materia_prima(materia_prima_id: int):
+        materia = MateriaPrima.query.get_or_404(materia_prima_id)
+        return jsonify(materia_prima_to_dict(materia))
+
+    @app.route("/materias-primas", methods=["POST"])
+    def crear_materia_prima():
+        data = request.get_json(silent=True) or {}
+        nombre = (data.get("nombre") or "").strip()
+        codigo = (data.get("codigo") or "").strip()
+        unidad = (data.get("unidad") or "").strip()
+        activo = _parse_bool(data.get("activo"), default=True)
+
+        if not nombre:
+            return jsonify({"error": "El nombre es requerido"}), 400
+        if not codigo:
+            return jsonify({"error": "El código es requerido"}), 400
+        if not unidad:
+            return jsonify({"error": "La unidad es requerida"}), 400
+        if MateriaPrima.query.filter_by(codigo=codigo).first():
+            return jsonify({"error": "Ya existe una materia prima con ese código"}), 409
+
+        try:
+            costo_unitario = _parse_decimal(
+                data.get("costo_unitario", 0), "costo_unitario", default=Decimal("0")
+            )
+            stock_actual = _parse_decimal(
+                data.get("stock_actual", 0), "stock_actual", default=Decimal("0")
+            )
+            stock_reservado = _parse_decimal(
+                data.get("stock_reservado", 0),
+                "stock_reservado",
+                default=Decimal("0"),
+            )
+            stock_minimo = _parse_decimal(
+                data.get("stock_minimo", 0), "stock_minimo", default=Decimal("0")
+            )
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+        materia = MateriaPrima(
+            nombre=nombre,
+            codigo=codigo,
+            unidad=unidad,
+            costo_unitario=costo_unitario or 0,
+            stock_actual=stock_actual or 0,
+            stock_reservado=stock_reservado or 0,
+            stock_minimo=stock_minimo or 0,
+            activo=activo,
+        )
+        db.session.add(materia)
+        db.session.commit()
+        return jsonify(materia_prima_to_dict(materia)), 201
+
+    @app.route("/materias-primas/<int:materia_prima_id>", methods=["PUT", "PATCH"])
+    def actualizar_materia_prima(materia_prima_id: int):
+        materia = MateriaPrima.query.get_or_404(materia_prima_id)
+        data = request.get_json(silent=True) or {}
+
+        if "nombre" in data:
+            nombre = (data.get("nombre") or "").strip()
+            if not nombre:
+                return jsonify({"error": "El nombre es requerido"}), 400
+            materia.nombre = nombre
+        if "codigo" in data:
+            codigo = (data.get("codigo") or "").strip()
+            if not codigo:
+                return jsonify({"error": "El código es requerido"}), 400
+            conflicto = (
+                MateriaPrima.query.filter_by(codigo=codigo)
+                .filter(MateriaPrima.id != materia.id)
+                .first()
+            )
+            if conflicto:
+                return jsonify({"error": "Ya existe una materia prima con ese código"}), 409
+            materia.codigo = codigo
+        if "unidad" in data:
+            unidad = (data.get("unidad") or "").strip()
+            if not unidad:
+                return jsonify({"error": "La unidad es requerida"}), 400
+            materia.unidad = unidad
+        if "activo" in data:
+            materia.activo = _parse_bool(data.get("activo"), default=materia.activo)
+
+        try:
+            if "costo_unitario" in data:
+                materia.costo_unitario = _parse_decimal(
+                    data.get("costo_unitario"), "costo_unitario"
+                )
+            if "stock_actual" in data:
+                materia.stock_actual = _parse_decimal(
+                    data.get("stock_actual"), "stock_actual"
+                )
+            if "stock_reservado" in data:
+                materia.stock_reservado = _parse_decimal(
+                    data.get("stock_reservado"), "stock_reservado"
+                )
+            if "stock_minimo" in data:
+                materia.stock_minimo = _parse_decimal(
+                    data.get("stock_minimo"), "stock_minimo"
+                )
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+        db.session.commit()
+        return jsonify(materia_prima_to_dict(materia))
+
+    @app.route("/materias-primas/<int:materia_prima_id>", methods=["DELETE"])
+    def eliminar_materia_prima(materia_prima_id: int):
+        materia = MateriaPrima.query.get_or_404(materia_prima_id)
+        db.session.delete(materia)
+        db.session.commit()
+        return jsonify({"message": "Materia prima eliminada"})
+
+    @app.route("/materias-primas/<int:materia_prima_id>/ajustes-stock", methods=["POST"])
+    def ajustar_stock_materia_prima(materia_prima_id: int):
+        materia = MateriaPrima.query.get_or_404(materia_prima_id)
+        data = request.get_json(silent=True) or {}
+        tipo = (data.get("tipo") or "").strip().upper()
+        motivo = (data.get("motivo") or "").strip() or None
+        observaciones = (data.get("observaciones") or "").strip() or None
+
+        if tipo not in {"ENTRADA", "SALIDA", "AJUSTE"}:
+            return jsonify({"error": "tipo debe ser ENTRADA, SALIDA o AJUSTE"}), 400
+
+        try:
+            cantidad = _parse_decimal(data.get("cantidad"), "cantidad")
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        if cantidad is None:
+            return jsonify({"error": "cantidad es requerida"}), 400
+
+        delta = cantidad if tipo in {"ENTRADA", "AJUSTE"} else -cantidad
+        nuevo_stock = Decimal(str(materia.stock_actual or 0)) + Decimal(str(delta))
+        if nuevo_stock < 0:
+            return jsonify({"error": "Stock insuficiente para el ajuste"}), 400
+
+        materia.stock_actual = nuevo_stock
+        ajuste = MateriaPrimaAjuste(
+            materia_prima_id=materia.id,
+            tipo=tipo,
+            cantidad=cantidad,
+            motivo=motivo,
+            observaciones=observaciones,
+        )
+        db.session.add(ajuste)
+        db.session.commit()
+        return jsonify({"materia_prima": materia_prima_to_dict(materia), "ajuste": ajuste_mp_to_dict(ajuste)})
+
+    @app.route("/productos/<int:producto_id>/bom", methods=["GET"])
+    def listar_bom_producto(producto_id: int):
+        Producto.query.get_or_404(producto_id)
+        items = ProductoMateriaPrima.query.filter_by(producto_id=producto_id).all()
+        return jsonify([producto_materia_prima_to_dict(i) for i in items])
+
+    @app.route("/productos/<int:producto_id>/bom", methods=["POST"])
+    def crear_bom_producto(producto_id: int):
+        Producto.query.get_or_404(producto_id)
+        data = request.get_json(silent=True) or {}
+        materia_prima_id = data.get("materia_prima_id")
+        if materia_prima_id is None:
+            return jsonify({"error": "materia_prima_id es requerido"}), 400
+        MateriaPrima.query.get_or_404(materia_prima_id)
+
+        existente = ProductoMateriaPrima.query.filter_by(
+            producto_id=producto_id, materia_prima_id=materia_prima_id
+        ).first()
+        if existente:
+            return jsonify({"error": "Ya existe esa materia prima en el BOM"}), 409
+
+        try:
+            cantidad_necesaria = _parse_decimal(
+                data.get("cantidad_necesaria"), "cantidad_necesaria"
+            )
+            merma_estandar = _parse_decimal(
+                data.get("merma_estandar", 0), "merma_estandar", default=Decimal("0")
+            )
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        if cantidad_necesaria is None:
+            return jsonify({"error": "cantidad_necesaria es requerida"}), 400
+
+        item = ProductoMateriaPrima(
+            producto_id=producto_id,
+            materia_prima_id=materia_prima_id,
+            cantidad_necesaria=cantidad_necesaria,
+            merma_estandar=merma_estandar or 0,
+            notas=(data.get("notas") or "").strip() or None,
+        )
+        db.session.add(item)
+        db.session.commit()
+        return jsonify(producto_materia_prima_to_dict(item)), 201
+
+    @app.route("/productos/<int:producto_id>/bom/<int:item_id>", methods=["PUT", "PATCH"])
+    def actualizar_bom_producto(producto_id: int, item_id: int):
+        item = ProductoMateriaPrima.query.filter_by(
+            id=item_id, producto_id=producto_id
+        ).first_or_404()
+        data = request.get_json(silent=True) or {}
+
+        if "materia_prima_id" in data:
+            materia_prima_id = data.get("materia_prima_id")
+            MateriaPrima.query.get_or_404(materia_prima_id)
+            existente = (
+                ProductoMateriaPrima.query.filter_by(
+                    producto_id=producto_id, materia_prima_id=materia_prima_id
+                )
+                .filter(ProductoMateriaPrima.id != item.id)
+                .first()
+            )
+            if existente:
+                return jsonify({"error": "Ya existe esa materia prima en el BOM"}), 409
+            item.materia_prima_id = materia_prima_id
+
+        try:
+            if "cantidad_necesaria" in data:
+                item.cantidad_necesaria = _parse_decimal(
+                    data.get("cantidad_necesaria"), "cantidad_necesaria"
+                )
+            if "merma_estandar" in data:
+                item.merma_estandar = _parse_decimal(
+                    data.get("merma_estandar"), "merma_estandar"
+                )
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+        if "notas" in data:
+            item.notas = (data.get("notas") or "").strip() or None
+
+        db.session.commit()
+        return jsonify(producto_materia_prima_to_dict(item))
+
+    @app.route("/productos/<int:producto_id>/bom/<int:item_id>", methods=["DELETE"])
+    def eliminar_bom_producto(producto_id: int, item_id: int):
+        item = ProductoMateriaPrima.query.filter_by(
+            id=item_id, producto_id=producto_id
+        ).first_or_404()
+        db.session.delete(item)
+        db.session.commit()
+        return jsonify({"message": "BOM eliminado"})
+
+    @app.route("/procesos", methods=["GET"])
+    def listar_procesos():
+        procesos = Proceso.query.order_by(Proceso.id).all()
+        return jsonify([proceso_to_dict(p) for p in procesos])
+
+    @app.route("/procesos/<int:proceso_id>", methods=["GET"])
+    def obtener_proceso(proceso_id: int):
+        proceso = Proceso.query.get_or_404(proceso_id)
+        return jsonify(proceso_to_dict(proceso))
+
+    @app.route("/procesos", methods=["POST"])
+    def crear_proceso():
+        data = request.get_json(silent=True) or {}
+        nombre = (data.get("nombre") or "").strip()
+        descripcion = (data.get("descripcion") or "").strip() or None
+        activo = _parse_bool(data.get("activo"), default=True)
+
+        if not nombre:
+            return jsonify({"error": "El nombre es requerido"}), 400
+        if Proceso.query.filter_by(nombre=nombre).first():
+            return jsonify({"error": "Ya existe un proceso con ese nombre"}), 409
+
+        proceso = Proceso(nombre=nombre, descripcion=descripcion, activo=activo)
+        db.session.add(proceso)
+        db.session.commit()
+        return jsonify(proceso_to_dict(proceso)), 201
+
+    @app.route("/procesos/<int:proceso_id>", methods=["PUT", "PATCH"])
+    def actualizar_proceso(proceso_id: int):
+        proceso = Proceso.query.get_or_404(proceso_id)
+        data = request.get_json(silent=True) or {}
+
+        if "nombre" in data:
+            nombre = (data.get("nombre") or "").strip()
+            if not nombre:
+                return jsonify({"error": "El nombre es requerido"}), 400
+            conflicto = (
+                Proceso.query.filter_by(nombre=nombre)
+                .filter(Proceso.id != proceso.id)
+                .first()
+            )
+            if conflicto:
+                return jsonify({"error": "Ya existe un proceso con ese nombre"}), 409
+            proceso.nombre = nombre
+
+        if "descripcion" in data:
+            proceso.descripcion = (data.get("descripcion") or "").strip() or None
+
+        if "activo" in data:
+            proceso.activo = _parse_bool(data.get("activo"), default=proceso.activo)
+
+        db.session.commit()
+        return jsonify(proceso_to_dict(proceso))
+
+    @app.route("/procesos/<int:proceso_id>", methods=["DELETE"])
+    def eliminar_proceso(proceso_id: int):
+        proceso = Proceso.query.get_or_404(proceso_id)
+        db.session.delete(proceso)
+        db.session.commit()
+        return jsonify({"message": "Proceso eliminado"})
+
+    @app.route("/productos/<int:producto_id>/ruta-procesos", methods=["GET"])
+    def listar_ruta_procesos(producto_id: int):
+        Producto.query.get_or_404(producto_id)
+        items = (
+            ProductoProceso.query.filter_by(producto_id=producto_id)
+            .order_by(ProductoProceso.orden)
+            .all()
+        )
+        return jsonify([producto_proceso_to_dict(i) for i in items])
+
+    @app.route("/productos/<int:producto_id>/ruta-procesos", methods=["POST"])
+    def crear_ruta_proceso(producto_id: int):
+        Producto.query.get_or_404(producto_id)
+        data = request.get_json(silent=True) or {}
+        proceso_id = data.get("proceso_id")
+        orden = data.get("orden")
+        if proceso_id is None:
+            return jsonify({"error": "proceso_id es requerido"}), 400
+        if orden is None:
+            return jsonify({"error": "orden es requerido"}), 400
+        Proceso.query.get_or_404(proceso_id)
+
+        existe_orden = ProductoProceso.query.filter_by(
+            producto_id=producto_id, orden=orden
+        ).first()
+        if existe_orden:
+            return jsonify({"error": "Ya existe un proceso con ese orden"}), 409
+
+        existe_proc = ProductoProceso.query.filter_by(
+            producto_id=producto_id, proceso_id=proceso_id
+        ).first()
+        if existe_proc:
+            return jsonify({"error": "El proceso ya está asignado al producto"}), 409
+
+        item = ProductoProceso(
+            producto_id=producto_id,
+            proceso_id=proceso_id,
+            orden=orden,
+            tiempo_objetivo_min=data.get("tiempo_objetivo_min"),
+            activo=_parse_bool(data.get("activo"), default=True),
+        )
+        db.session.add(item)
+        db.session.commit()
+        return jsonify(producto_proceso_to_dict(item)), 201
+
+    @app.route(
+        "/productos/<int:producto_id>/ruta-procesos/<int:item_id>",
+        methods=["PUT", "PATCH"],
+    )
+    def actualizar_ruta_proceso(producto_id: int, item_id: int):
+        item = ProductoProceso.query.filter_by(
+            id=item_id, producto_id=producto_id
+        ).first_or_404()
+        data = request.get_json(silent=True) or {}
+
+        if "proceso_id" in data:
+            proceso_id = data.get("proceso_id")
+            Proceso.query.get_or_404(proceso_id)
+            existe = (
+                ProductoProceso.query.filter_by(
+                    producto_id=producto_id, proceso_id=proceso_id
+                )
+                .filter(ProductoProceso.id != item.id)
+                .first()
+            )
+            if existe:
+                return jsonify({"error": "El proceso ya está asignado al producto"}), 409
+            item.proceso_id = proceso_id
+
+        if "orden" in data:
+            orden = data.get("orden")
+            existe = (
+                ProductoProceso.query.filter_by(producto_id=producto_id, orden=orden)
+                .filter(ProductoProceso.id != item.id)
+                .first()
+            )
+            if existe:
+                return jsonify({"error": "Ya existe un proceso con ese orden"}), 409
+            item.orden = orden
+
+        if "tiempo_objetivo_min" in data:
+            item.tiempo_objetivo_min = data.get("tiempo_objetivo_min")
+
+        if "activo" in data:
+            item.activo = _parse_bool(data.get("activo"), default=item.activo)
+
+        db.session.commit()
+        return jsonify(producto_proceso_to_dict(item))
+
+    @app.route(
+        "/productos/<int:producto_id>/ruta-procesos/<int:item_id>",
+        methods=["DELETE"],
+    )
+    def eliminar_ruta_proceso(producto_id: int, item_id: int):
+        item = ProductoProceso.query.filter_by(
+            id=item_id, producto_id=producto_id
+        ).first_or_404()
+        db.session.delete(item)
+        db.session.commit()
+        return jsonify({"message": "Ruta de proceso eliminada"})
+
+    @app.route("/ordenes-produccion", methods=["GET"])
+    def listar_ordenes_produccion():
+        ordenes = OrdenProduccion.query.order_by(OrdenProduccion.id).all()
+        return jsonify([orden_produccion_to_dict(o) for o in ordenes])
+
+    @app.route("/ordenes-produccion/<int:orden_id>", methods=["GET"])
+    def obtener_orden_produccion(orden_id: int):
+        orden = OrdenProduccion.query.get_or_404(orden_id)
+        return jsonify(orden_produccion_to_dict(orden, include_detalle=True))
+
+    @app.route("/ordenes-produccion", methods=["POST"])
+    def crear_orden_produccion():
+        data = request.get_json(silent=True) or {}
+        codigo = (data.get("codigo") or "").strip()
+        producto_id = data.get("producto_id")
+        prioridad = data.get("prioridad")
+        notas = (data.get("notas") or "").strip() or None
+        estado = (data.get("estado") or "PLANIFICADA").strip().upper()
+
+        if not codigo:
+            return jsonify({"error": "El código es requerido"}), 400
+        if OrdenProduccion.query.filter_by(codigo=codigo).first():
+            return jsonify({"error": "Ya existe una orden con ese código"}), 409
+
+        try:
+            cantidad_planeada = _parse_decimal(
+                data.get("cantidad_planeada"), "cantidad_planeada"
+            )
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        if cantidad_planeada is None or cantidad_planeada <= 0:
+            return jsonify({"error": "cantidad_planeada debe ser mayor que cero"}), 400
+
+        producto = Producto.query.get(producto_id)
+        if not producto:
+            return jsonify({"error": "producto_id no encontrado"}), 404
+
+        bom_items = ProductoMateriaPrima.query.filter_by(producto_id=producto_id).all()
+        if not bom_items:
+            return jsonify({"error": "El producto no tiene BOM configurado"}), 400
+
+        ruta = (
+            ProductoProceso.query.filter_by(producto_id=producto_id, activo=True)
+            .order_by(ProductoProceso.orden)
+            .all()
+        )
+        if not ruta:
+            return jsonify({"error": "El producto no tiene ruta de procesos"}), 400
+
+        for item in bom_items:
+            materia = MateriaPrima.query.get(item.materia_prima_id)
+            if not materia:
+                return jsonify({"error": "Materia prima no encontrada en BOM"}), 404
+            teorico = _calcular_teorico(item, cantidad_planeada)
+            disponible = Decimal(str(materia.stock_actual or 0)) - Decimal(
+                str(materia.stock_reservado or 0)
+            )
+            if disponible < teorico:
+                return (
+                    jsonify(
+                        {
+                            "error": f"Stock insuficiente para {materia.codigo}",
+                            "disponible": float(disponible),
+                            "requerido": float(teorico),
+                        }
+                    ),
+                    400,
+                )
+
+        orden = OrdenProduccion(
+            codigo=codigo,
+            producto_id=producto_id,
+            cantidad_planeada=cantidad_planeada,
+            estado=estado,
+            prioridad=prioridad,
+            notas=notas,
+        )
+        db.session.add(orden)
+        db.session.flush()
+
+        for item in bom_items:
+            teorico = _calcular_teorico(item, cantidad_planeada)
+            consumo = ConsumoMateriaPrima(
+                orden_produccion_id=orden.id,
+                materia_prima_id=item.materia_prima_id,
+                cantidad_teorica=teorico,
+            )
+            db.session.add(consumo)
+            materia = MateriaPrima.query.get(item.materia_prima_id)
+            materia.stock_reservado = Decimal(str(materia.stock_reservado or 0)) + teorico
+
+        for item in ruta:
+            proceso_orden = ProcesoOrden(
+                orden_produccion_id=orden.id,
+                proceso_id=item.proceso_id,
+                orden=item.orden,
+                estado="PENDIENTE",
+            )
+            db.session.add(proceso_orden)
+
+        db.session.commit()
+        return jsonify(orden_produccion_to_dict(orden, include_detalle=True)), 201
+
+    @app.route("/ordenes-produccion/<int:orden_id>", methods=["PUT", "PATCH"])
+    def actualizar_orden_produccion(orden_id: int):
+        orden = OrdenProduccion.query.get_or_404(orden_id)
+        data = request.get_json(silent=True) or {}
+
+        if "notas" in data:
+            orden.notas = (data.get("notas") or "").strip() or None
+        if "prioridad" in data:
+            orden.prioridad = data.get("prioridad")
+
+        if "cantidad_planeada" in data:
+            return jsonify({"error": "No se permite cambiar cantidad_planeada"}), 400
+
+        if "estado" in data:
+            estado = (data.get("estado") or "").strip().upper()
+            if estado in {"CANCELADA", "COMPLETADA"}:
+                return jsonify({"error": "Use los endpoints de acciones"}), 400
+            orden.estado = estado
+
+        db.session.commit()
+        return jsonify(orden_produccion_to_dict(orden, include_detalle=True))
+
+    @app.route("/ordenes-produccion/<int:orden_id>", methods=["DELETE"])
+    def eliminar_orden_produccion(orden_id: int):
+        orden = OrdenProduccion.query.get_or_404(orden_id)
+        if orden.estado not in {"BORRADOR", "PLANIFICADA", "CANCELADA"}:
+            return jsonify({"error": "No se puede eliminar una orden en proceso"}), 400
+        for consumo in orden.consumos.all():
+            teorico = Decimal(str(consumo.cantidad_teorica or 0))
+            real = Decimal(str(consumo.cantidad_real or 0))
+            restante = teorico - real
+            if restante > 0:
+                materia = MateriaPrima.query.get(consumo.materia_prima_id)
+                materia.stock_reservado = max(
+                    Decimal(str(materia.stock_reservado or 0)) - restante, Decimal("0")
+                )
+        ConsumoMateriaPrima.query.filter_by(orden_produccion_id=orden.id).delete()
+        ProcesoOrden.query.filter_by(orden_produccion_id=orden.id).delete()
+        db.session.delete(orden)
+        db.session.commit()
+        return jsonify({"message": "Orden de producción eliminada"})
+
+    @app.route("/ordenes-produccion/<int:orden_id>/iniciar", methods=["POST"])
+    def iniciar_orden_produccion(orden_id: int):
+        orden = OrdenProduccion.query.get_or_404(orden_id)
+        if orden.estado in {"CANCELADA", "COMPLETADA"}:
+            return jsonify({"error": "La orden no se puede iniciar"}), 400
+        orden.estado = "EN_PROCESO"
+        if not orden.fecha_inicio:
+            orden.fecha_inicio = datetime.utcnow()
+        db.session.commit()
+        return jsonify(orden_produccion_to_dict(orden, include_detalle=True))
+
+    @app.route("/ordenes-produccion/<int:orden_id>/pausar", methods=["POST"])
+    def pausar_orden_produccion(orden_id: int):
+        orden = OrdenProduccion.query.get_or_404(orden_id)
+        if orden.estado != "EN_PROCESO":
+            return jsonify({"error": "La orden no está en proceso"}), 400
+        orden.estado = "PAUSADA"
+        db.session.commit()
+        return jsonify(orden_produccion_to_dict(orden, include_detalle=True))
+
+    @app.route("/ordenes-produccion/<int:orden_id>/cancelar", methods=["POST"])
+    def cancelar_orden_produccion(orden_id: int):
+        orden = OrdenProduccion.query.get_or_404(orden_id)
+        if orden.estado == "CANCELADA":
+            return jsonify({"error": "La orden ya está cancelada"}), 400
+        orden.estado = "CANCELADA"
+        if not orden.fecha_fin:
+            orden.fecha_fin = datetime.utcnow()
+        for consumo in orden.consumos.all():
+            teorico = Decimal(str(consumo.cantidad_teorica or 0))
+            real = Decimal(str(consumo.cantidad_real or 0))
+            restante = teorico - real
+            if restante > 0:
+                materia = MateriaPrima.query.get(consumo.materia_prima_id)
+                materia.stock_reservado = max(
+                    Decimal(str(materia.stock_reservado or 0)) - restante, Decimal("0")
+                )
+        db.session.commit()
+        return jsonify(orden_produccion_to_dict(orden, include_detalle=True))
+
+    @app.route("/ordenes-produccion/<int:orden_id>/cerrar", methods=["POST"])
+    def cerrar_orden_produccion(orden_id: int):
+        orden = OrdenProduccion.query.get_or_404(orden_id)
+        data = request.get_json(silent=True) or {}
+        if orden.estado == "CANCELADA":
+            return jsonify({"error": "La orden está cancelada"}), 400
+        orden.estado = "COMPLETADA"
+        if not orden.fecha_fin:
+            orden.fecha_fin = datetime.utcnow()
+        if "cantidad_final_buena" in data:
+            try:
+                orden.cantidad_final_buena = _parse_decimal(
+                    data.get("cantidad_final_buena"), "cantidad_final_buena"
+                )
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
+        else:
+            ultimo = (
+                orden.procesos.order_by(ProcesoOrden.orden.desc()).first()
+                if hasattr(orden.procesos, "order_by")
+                else None
+            )
+            if ultimo and ultimo.cantidad_salida is not None:
+                orden.cantidad_final_buena = ultimo.cantidad_salida
+        db.session.commit()
+        return jsonify(orden_produccion_to_dict(orden, include_detalle=True))
+
+    @app.route("/ordenes-produccion/<int:orden_id>/procesos", methods=["GET"])
+    def listar_procesos_orden(orden_id: int):
+        OrdenProduccion.query.get_or_404(orden_id)
+        procesos = (
+            ProcesoOrden.query.filter_by(orden_produccion_id=orden_id)
+            .order_by(ProcesoOrden.orden)
+            .all()
+        )
+        return jsonify([proceso_orden_to_dict(p) for p in procesos])
+
+    def _validar_proceso_orden(orden_id: int, proceso_orden_id: int):
+        proceso_orden = ProcesoOrden.query.get_or_404(proceso_orden_id)
+        if proceso_orden.orden_produccion_id != orden_id:
+            return None
+        return proceso_orden
+
+    @app.route(
+        "/ordenes-produccion/<int:orden_id>/procesos/<int:proceso_orden_id>/iniciar",
+        methods=["POST"],
+    )
+    def iniciar_proceso_orden(orden_id: int, proceso_orden_id: int):
+        proceso_orden = _validar_proceso_orden(orden_id, proceso_orden_id)
+        if not proceso_orden:
+            return jsonify({"error": "Proceso no pertenece a la orden"}), 400
+        if proceso_orden.estado == "COMPLETADO":
+            return jsonify({"error": "El proceso ya fue completado"}), 400
+
+        previo = ProcesoOrden.query.filter_by(
+            orden_produccion_id=orden_id, orden=proceso_orden.orden - 1
+        ).first()
+        if previo and previo.estado != "COMPLETADO":
+            return jsonify({"error": "Debe completar el proceso anterior"}), 400
+
+        activo = ProcesoOrden.query.filter_by(
+            orden_produccion_id=orden_id, estado="EN_PROCESO"
+        ).first()
+        if activo and activo.id != proceso_orden.id:
+            return jsonify({"error": "Ya hay un proceso en curso"}), 400
+
+        proceso_orden.estado = "EN_PROCESO"
+        if not proceso_orden.inicio:
+            proceso_orden.inicio = datetime.utcnow()
+
+        orden = OrdenProduccion.query.get(orden_id)
+        if orden and orden.estado not in {"EN_PROCESO", "COMPLETADA"}:
+            orden.estado = "EN_PROCESO"
+            if not orden.fecha_inicio:
+                orden.fecha_inicio = datetime.utcnow()
+
+        db.session.commit()
+        return jsonify(proceso_orden_to_dict(proceso_orden))
+
+    @app.route(
+        "/ordenes-produccion/<int:orden_id>/procesos/<int:proceso_orden_id>/pausar",
+        methods=["POST"],
+    )
+    def pausar_proceso_orden(orden_id: int, proceso_orden_id: int):
+        proceso_orden = _validar_proceso_orden(orden_id, proceso_orden_id)
+        if not proceso_orden:
+            return jsonify({"error": "Proceso no pertenece a la orden"}), 400
+        if proceso_orden.estado != "EN_PROCESO":
+            return jsonify({"error": "El proceso no está en curso"}), 400
+        proceso_orden.estado = "PAUSADO"
+        db.session.commit()
+        return jsonify(proceso_orden_to_dict(proceso_orden))
+
+    @app.route(
+        "/ordenes-produccion/<int:orden_id>/procesos/<int:proceso_orden_id>/completar",
+        methods=["POST"],
+    )
+    def completar_proceso_orden(orden_id: int, proceso_orden_id: int):
+        proceso_orden = _validar_proceso_orden(orden_id, proceso_orden_id)
+        if not proceso_orden:
+            return jsonify({"error": "Proceso no pertenece a la orden"}), 400
+        if proceso_orden.estado not in {"EN_PROCESO", "PAUSADO"}:
+            return jsonify({"error": "El proceso no está activo"}), 400
+
+        data = request.get_json(silent=True) or {}
+        try:
+            if "cantidad_entrada" in data:
+                proceso_orden.cantidad_entrada = _parse_decimal(
+                    data.get("cantidad_entrada"), "cantidad_entrada"
+                )
+            if "cantidad_salida" in data:
+                proceso_orden.cantidad_salida = _parse_decimal(
+                    data.get("cantidad_salida"), "cantidad_salida"
+                )
+            if "cantidad_perdida" in data:
+                proceso_orden.cantidad_perdida = _parse_decimal(
+                    data.get("cantidad_perdida"), "cantidad_perdida"
+                )
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+        if proceso_orden.cantidad_perdida is None:
+            if (
+                proceso_orden.cantidad_entrada is not None
+                and proceso_orden.cantidad_salida is not None
+            ):
+                perdida = proceso_orden.cantidad_entrada - proceso_orden.cantidad_salida
+                proceso_orden.cantidad_perdida = perdida if perdida > 0 else 0
+
+        if "motivo_perdida" in data:
+            proceso_orden.motivo_perdida = (
+                (data.get("motivo_perdida") or "").strip() or None
+            )
+        if "observaciones" in data:
+            proceso_orden.observaciones = (
+                (data.get("observaciones") or "").strip() or None
+            )
+
+        proceso_orden.estado = "COMPLETADO"
+        if not proceso_orden.fin:
+            proceso_orden.fin = datetime.utcnow()
+
+        orden = OrdenProduccion.query.get(orden_id)
+        restantes = ProcesoOrden.query.filter_by(
+            orden_produccion_id=orden_id
+        ).filter(ProcesoOrden.estado != "COMPLETADO")
+        if not restantes.first() and orden and orden.estado != "CANCELADA":
+            orden.estado = "COMPLETADA"
+            if not orden.fecha_fin:
+                orden.fecha_fin = datetime.utcnow()
+            if orden.cantidad_final_buena is None and proceso_orden.cantidad_salida:
+                orden.cantidad_final_buena = proceso_orden.cantidad_salida
+
+        db.session.commit()
+        return jsonify(proceso_orden_to_dict(proceso_orden))
+
+    @app.route("/ordenes-produccion/<int:orden_id>/consumos", methods=["GET"])
+    def listar_consumos_orden(orden_id: int):
+        OrdenProduccion.query.get_or_404(orden_id)
+        consumos = ConsumoMateriaPrima.query.filter_by(
+            orden_produccion_id=orden_id
+        ).all()
+        return jsonify([consumo_materia_prima_to_dict(c) for c in consumos])
+
+    @app.route("/ordenes-produccion/<int:orden_id>/consumos", methods=["POST"])
+    def crear_consumo_orden(orden_id: int):
+        OrdenProduccion.query.get_or_404(orden_id)
+        data = request.get_json(silent=True) or {}
+        materia_prima_id = data.get("materia_prima_id")
+        if materia_prima_id is None:
+            return jsonify({"error": "materia_prima_id es requerido"}), 400
+        materia = MateriaPrima.query.get(materia_prima_id)
+        if not materia:
+            return jsonify({"error": "materia_prima_id no encontrado"}), 404
+
+        proceso_orden_id = data.get("proceso_orden_id")
+        if proceso_orden_id is not None:
+            proceso_orden = ProcesoOrden.query.get(proceso_orden_id)
+            if not proceso_orden or proceso_orden.orden_produccion_id != orden_id:
+                return jsonify({"error": "proceso_orden_id inválido"}), 400
+
+        try:
+            cantidad_real = _parse_decimal(
+                data.get("cantidad_real"), "cantidad_real"
+            )
+            cantidad_teorica = _parse_decimal(
+                data.get("cantidad_teorica", 0),
+                "cantidad_teorica",
+                default=Decimal("0"),
+            )
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+        if cantidad_real is None or cantidad_real <= 0:
+            return jsonify({"error": "cantidad_real debe ser mayor que cero"}), 400
+
+        disponible = Decimal(str(materia.stock_actual or 0))
+        if disponible < cantidad_real:
+            return jsonify({"error": "Stock insuficiente"}), 400
+
+        restante = _reservado_restante(orden_id, materia_prima_id)
+
+        consumo = ConsumoMateriaPrima(
+            orden_produccion_id=orden_id,
+            proceso_orden_id=proceso_orden_id,
+            materia_prima_id=materia_prima_id,
+            cantidad_teorica=cantidad_teorica or 0,
+            cantidad_real=cantidad_real,
+            desperdicio=(cantidad_real - (cantidad_teorica or 0)),
+            observaciones=(data.get("observaciones") or "").strip() or None,
+        )
+        db.session.add(consumo)
+
+        materia.stock_actual = disponible - cantidad_real
+        liberar = cantidad_real if cantidad_real <= restante else restante
+        materia.stock_reservado = max(
+            Decimal(str(materia.stock_reservado or 0)) - liberar, Decimal("0")
+        )
+
+        db.session.commit()
+        return jsonify(consumo_materia_prima_to_dict(consumo)), 201
+
+    @app.route(
+        "/ordenes-produccion/<int:orden_id>/consumos/<int:consumo_id>",
+        methods=["PUT", "PATCH"],
+    )
+    def actualizar_consumo_orden(orden_id: int, consumo_id: int):
+        consumo = ConsumoMateriaPrima.query.get_or_404(consumo_id)
+        if consumo.orden_produccion_id != orden_id:
+            return jsonify({"error": "Consumo no pertenece a la orden"}), 400
+        data = request.get_json(silent=True) or {}
+
+        if "proceso_orden_id" in data:
+            proceso_orden_id = data.get("proceso_orden_id")
+            if proceso_orden_id is not None:
+                proceso_orden = ProcesoOrden.query.get(proceso_orden_id)
+                if not proceso_orden or proceso_orden.orden_produccion_id != orden_id:
+                    return jsonify({"error": "proceso_orden_id inválido"}), 400
+            consumo.proceso_orden_id = proceso_orden_id
+
+        old_real = Decimal(str(consumo.cantidad_real or 0))
+        old_teorico = Decimal(str(consumo.cantidad_teorica or 0))
+
+        new_teorico = old_teorico
+        new_real = old_real
+        try:
+            if "cantidad_teorica" in data:
+                parsed = _parse_decimal(data.get("cantidad_teorica"), "cantidad_teorica")
+                new_teorico = Decimal(str(parsed or 0))
+            if "cantidad_real" in data:
+                parsed = _parse_decimal(data.get("cantidad_real"), "cantidad_real")
+                new_real = Decimal(str(parsed or 0))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+        materia = MateriaPrima.query.get(consumo.materia_prima_id)
+        total_teorico = sum(
+            Decimal(str(c.cantidad_teorica or 0))
+            for c in ConsumoMateriaPrima.query.filter_by(
+                orden_produccion_id=orden_id, materia_prima_id=consumo.materia_prima_id
+            ).all()
+        )
+        total_real = sum(
+            Decimal(str(c.cantidad_real or 0))
+            for c in ConsumoMateriaPrima.query.filter_by(
+                orden_produccion_id=orden_id, materia_prima_id=consumo.materia_prima_id
+            ).all()
+        )
+        total_teorico_after = total_teorico - old_teorico + new_teorico
+        total_real_after = total_real - old_real + new_real
+
+        delta_real = new_real - old_real
+        if delta_real != 0:
+            disponible = Decimal(str(materia.stock_actual or 0))
+            if delta_real > 0 and disponible < delta_real:
+                return jsonify({"error": "Stock insuficiente"}), 400
+            materia.stock_actual = disponible - delta_real
+
+        reservado_before = total_teorico - total_real
+        reservado_before = reservado_before if reservado_before > 0 else Decimal("0")
+        reservado_after = total_teorico_after - total_real_after
+        reservado_after = reservado_after if reservado_after > 0 else Decimal("0")
+        delta_reservado = reservado_after - reservado_before
+        if delta_reservado != 0:
+            materia.stock_reservado = max(
+                Decimal(str(materia.stock_reservado or 0)) + delta_reservado, Decimal("0")
+            )
+
+        consumo.cantidad_teorica = new_teorico
+        consumo.cantidad_real = new_real
+        consumo.desperdicio = new_real - new_teorico
+
+        if "observaciones" in data:
+            consumo.observaciones = (data.get("observaciones") or "").strip() or None
+
+        db.session.commit()
+        return jsonify(consumo_materia_prima_to_dict(consumo))
+
+    @app.route(
+        "/ordenes-produccion/<int:orden_id>/consumos/<int:consumo_id>",
+        methods=["DELETE"],
+    )
+    def eliminar_consumo_orden(orden_id: int, consumo_id: int):
+        consumo = ConsumoMateriaPrima.query.get_or_404(consumo_id)
+        if consumo.orden_produccion_id != orden_id:
+            return jsonify({"error": "Consumo no pertenece a la orden"}), 400
+
+        materia = MateriaPrima.query.get(consumo.materia_prima_id)
+        old_real = Decimal(str(consumo.cantidad_real or 0))
+        if old_real > 0:
+            materia.stock_actual = Decimal(str(materia.stock_actual or 0)) + old_real
+
+            total_teorico = sum(
+                Decimal(str(c.cantidad_teorica or 0))
+                for c in ConsumoMateriaPrima.query.filter_by(
+                    orden_produccion_id=orden_id,
+                    materia_prima_id=consumo.materia_prima_id,
+                ).all()
+            )
+            total_real = sum(
+                Decimal(str(c.cantidad_real or 0))
+                for c in ConsumoMateriaPrima.query.filter_by(
+                    orden_produccion_id=orden_id,
+                    materia_prima_id=consumo.materia_prima_id,
+                ).all()
+            )
+            reservado_before = total_teorico - total_real
+            reservado_before = reservado_before if reservado_before > 0 else Decimal("0")
+            reservado_after = total_teorico - (total_real - old_real)
+            reservado_after = reservado_after if reservado_after > 0 else Decimal("0")
+            delta_reservado = reservado_after - reservado_before
+            materia.stock_reservado = max(
+                Decimal(str(materia.stock_reservado or 0)) + delta_reservado, Decimal("0")
+            )
+
+        db.session.delete(consumo)
+        db.session.commit()
+        return jsonify({"message": "Consumo eliminado"})
+
+    # ---------- REPORTES ----------
+
+    @app.route("/reportes/tiempo-total-orden", methods=["GET"])
+    def reporte_tiempo_total_orden():
+        desde = request.args.get("desde")
+        hasta = request.args.get("hasta")
+        try:
+            desde_dt = _parse_datetime(desde, "desde") if desde else None
+            hasta_dt = _parse_datetime(hasta, "hasta") if hasta else None
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+        ordenes = OrdenProduccion.query.all()
+        resultados = []
+        now = datetime.utcnow()
+        for orden in ordenes:
+            if desde_dt and orden.fecha_inicio and orden.fecha_inicio < desde_dt:
+                continue
+            if hasta_dt and orden.fecha_inicio and orden.fecha_inicio > hasta_dt:
+                continue
+            if not orden.fecha_inicio:
+                duracion_min = None
+            else:
+                fin = orden.fecha_fin or now
+                duracion_min = (fin - orden.fecha_inicio).total_seconds() / 60
+            resultados.append(
+                {
+                    "orden_id": orden.id,
+                    "codigo": orden.codigo,
+                    "duracion_min": duracion_min,
+                }
+            )
+        return jsonify(resultados)
+
+    @app.route("/reportes/tiempo-por-proceso", methods=["GET"])
+    def reporte_tiempo_por_proceso():
+        procesos = Proceso.query.all()
+        proceso_map = {p.id: p.nombre for p in procesos}
+        items = ProcesoOrden.query.filter(
+            ProcesoOrden.inicio.isnot(None), ProcesoOrden.fin.isnot(None)
+        ).all()
+        detalle = []
+        agregados = {}
+        for item in items:
+            duracion = (item.fin - item.inicio).total_seconds() / 60
+            detalle.append(
+                {
+                    "orden_produccion_id": item.orden_produccion_id,
+                    "proceso_id": item.proceso_id,
+                    "proceso_nombre": proceso_map.get(item.proceso_id),
+                    "duracion_min": duracion,
+                }
+            )
+            agg = agregados.setdefault(item.proceso_id, {"total": 0, "count": 0})
+            agg["total"] += duracion
+            agg["count"] += 1
+
+        promedios = []
+        for proceso_id, agg in agregados.items():
+            promedios.append(
+                {
+                    "proceso_id": proceso_id,
+                    "proceso_nombre": proceso_map.get(proceso_id),
+                    "promedio_min": agg["total"] / agg["count"]
+                    if agg["count"]
+                    else None,
+                    "total_registros": agg["count"],
+                }
+            )
+        return jsonify({"promedios": promedios, "detalle": detalle})
+
+    @app.route("/reportes/perdidas-por-proceso", methods=["GET"])
+    def reporte_perdidas_por_proceso():
+        procesos = Proceso.query.all()
+        proceso_map = {p.id: p.nombre for p in procesos}
+        items = ProcesoOrden.query.all()
+        acumulado = {}
+        for item in items:
+            perdida = Decimal(str(item.cantidad_perdida or 0))
+            acumulado[item.proceso_id] = acumulado.get(item.proceso_id, Decimal("0")) + perdida
+        respuesta = [
+            {
+                "proceso_id": pid,
+                "proceso_nombre": proceso_map.get(pid),
+                "cantidad_perdida": float(total),
+            }
+            for pid, total in acumulado.items()
+        ]
+        return jsonify(respuesta)
+
+    @app.route("/reportes/consumo-teorico-vs-real", methods=["GET"])
+    def reporte_consumo_teorico_vs_real():
+        orden_id = request.args.get("orden_id")
+        if not orden_id:
+            return jsonify({"error": "orden_id es requerido"}), 400
+        orden = OrdenProduccion.query.get(orden_id)
+        if not orden:
+            return jsonify({"error": "Orden no encontrada"}), 404
+        consumos = ConsumoMateriaPrima.query.filter_by(
+            orden_produccion_id=orden_id
+        ).all()
+        total_teorico = sum(Decimal(str(c.cantidad_teorica or 0)) for c in consumos)
+        total_real = sum(Decimal(str(c.cantidad_real or 0)) for c in consumos)
+        return jsonify(
+            {
+                "orden_id": orden.id,
+                "codigo": orden.codigo,
+                "total_teorico": float(total_teorico),
+                "total_real": float(total_real),
+                "delta": float(total_real - total_teorico),
+            }
+        )
+
+    @app.route("/reportes/ordenes-atascadas", methods=["GET"])
+    def reporte_ordenes_atascadas():
+        minutos = request.args.get("minutos", 120)
+        try:
+            minutos = int(minutos)
+        except (TypeError, ValueError):
+            return jsonify({"error": "minutos debe ser entero"}), 400
+        limite = datetime.utcnow() - timedelta(minutes=minutos)
+        procesos = ProcesoOrden.query.filter(
+            ProcesoOrden.estado == "EN_PROCESO", ProcesoOrden.inicio < limite
+        ).all()
+        respuesta = [
+            {
+                "orden_produccion_id": p.orden_produccion_id,
+                "proceso_id": p.proceso_id,
+                "proceso_orden_id": p.id,
+                "inicio": p.inicio.isoformat() if p.inicio else None,
+            }
+            for p in procesos
+        ]
+        return jsonify(respuesta)
 
     prefix = app.config.get("URL_PREFIX", "/coproda")
     if prefix:
