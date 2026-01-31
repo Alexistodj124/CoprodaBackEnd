@@ -169,6 +169,7 @@ def create_app():
             "codigo": producto.codigo,
             "categoria_id": producto.categoria_id,
             "activo": producto.activo,
+            "es_producto_final": producto.es_producto_final,
             "precio_cf": float(producto.precio_cf),
             "precio_minorista": float(producto.precio_minorista),
             "precio_mayorista": float(producto.precio_mayorista),
@@ -217,6 +218,9 @@ def create_app():
         foto = (data.get("foto") or "").strip() or None
         categoria_id = data.get("categoria_id")
         activo = _parse_bool(data.get("activo"), default=True)
+        es_producto_final = _parse_bool(
+            data.get("es_producto_final"), default=True
+        )
         if not nombre:
             return jsonify({"error": "El nombre es requerido"}), 400
         if not codigo:
@@ -251,24 +255,16 @@ def create_app():
             stock_minimo = _parse_decimal(
                 data.get("stock_minimo", 0), "stock_minimo", default=Decimal("0")
             )
-            peso_unitario_est_val = (
-                _parse_precio(peso_unitario_est, "peso_unitario_est") or 0
-            )
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
 
         producto = Producto(
             nombre=nombre,
             codigo=codigo,
-            sku=sku,
             foto=foto,
             categoria_id=categoria_id,
             activo=activo,
-            unidad_produccion=unidad_produccion,
-            lead_time_objetivo_min=lead_time_objetivo_min,
-            peso_unitario_est=peso_unitario_est_val,
-            version_bom=version_bom or 1,
-            notas_produccion=notas_produccion,
+            es_producto_final=es_producto_final,
             precio_cf=precio_cf,
             precio_minorista=precio_minorista,
             precio_mayorista=precio_mayorista,
@@ -328,6 +324,11 @@ def create_app():
 
         if "activo" in data:
             producto.activo = _parse_bool(data.get("activo"), default=producto.activo)
+
+        if "es_producto_final" in data:
+            producto.es_producto_final = _parse_bool(
+                data.get("es_producto_final"), default=producto.es_producto_final
+            )
 
         if "unidad_produccion" in data:
             producto.unidad_produccion = (
@@ -1213,6 +1214,8 @@ def create_app():
             producto = Producto.query.get(producto_id)
             if not producto:
                 raise LookupError("producto_id no encontrado")
+            if not producto.es_producto_final:
+                raise ValueError("producto_id no es producto final")
             try:
                 cantidad_int = int(cantidad)
             except (TypeError, ValueError):
