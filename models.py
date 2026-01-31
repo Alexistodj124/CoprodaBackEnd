@@ -309,6 +309,7 @@ class ProductoMateriaPrima(db.Model):
     materia_prima_id = db.Column(
         db.Integer, db.ForeignKey("materias_primas.id"), nullable=False
     )
+    proceso_id = db.Column(db.Integer, db.ForeignKey("procesos.id"))
     cantidad_necesaria = db.Column(Numeric(12, 4), nullable=False, default=0)
     merma_estandar = db.Column(Numeric(12, 4), default=0, nullable=False)
     notas = db.Column(db.Text)
@@ -319,6 +320,7 @@ class ProductoMateriaPrima(db.Model):
 
     producto = db.relationship("Producto", back_populates="bom_items")
     materia_prima = db.relationship("MateriaPrima", back_populates="bom_productos")
+    proceso = db.relationship("Proceso")
 
     def __repr__(self) -> str:
         return f"<ProductoMateriaPrima {self.producto_id}-{self.materia_prima_id}>"
@@ -335,6 +337,7 @@ class ProductoComponente(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     producto_id = db.Column(db.Integer, db.ForeignKey("productos.id"), nullable=False)
     componente_id = db.Column(db.Integer, db.ForeignKey("productos.id"), nullable=False)
+    proceso_id = db.Column(db.Integer, db.ForeignKey("procesos.id"))
     cantidad_necesaria = db.Column(Numeric(12, 4), nullable=False, default=0)
     merma_estandar = db.Column(Numeric(12, 4), default=0, nullable=False)
     notas = db.Column(db.Text)
@@ -349,6 +352,7 @@ class ProductoComponente(db.Model):
     componente = db.relationship(
         "Producto", foreign_keys=[componente_id], back_populates="usado_en_componentes"
     )
+    proceso = db.relationship("Proceso")
 
     def __repr__(self) -> str:
         return f"<ProductoComponente {self.producto_id}-{self.componente_id}>"

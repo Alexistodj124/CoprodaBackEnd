@@ -1484,6 +1484,7 @@ def create_app():
             "id": item.id,
             "producto_id": item.producto_id,
             "materia_prima_id": item.materia_prima_id,
+            "proceso_id": item.proceso_id,
             "cantidad_necesaria": float(item.cantidad_necesaria or 0),
             "merma_estandar": float(item.merma_estandar or 0),
             "notas": item.notas,
@@ -1498,6 +1499,7 @@ def create_app():
             "id": item.id,
             "producto_id": item.producto_id,
             "componente_id": item.componente_id,
+            "proceso_id": item.proceso_id,
             "cantidad_necesaria": float(item.cantidad_necesaria or 0),
             "merma_estandar": float(item.merma_estandar or 0),
             "notas": item.notas,
@@ -1684,6 +1686,87 @@ def create_app():
         restante = total_teorico - total_real
         return restante if restante > 0 else Decimal("0")
 
+    def _cantidad_base_proceso(proceso_orden: ProcesoOrden, orden: OrdenProduccion):
+        if proceso_orden.cantidad_salida is not None:
+            return Decimal(str(proceso_orden.cantidad_salida))
+        if proceso_orden.cantidad_entrada is not None:
+            return Decimal(str(proceso_orden.cantidad_entrada))
+        return Decimal(str(orden.cantidad_planeada or 0))
+
+    def _registrar_consumo_mp_auto(
+        orden: OrdenProduccion,
+        proceso_orden: ProcesoOrden,
+        materia_prima_id: int,
+        cantidad_teorica: Decimal,
+    ):
+        existente = ConsumoMateriaPrima.query.filter_by(
+            orden_produccion_id=orden.id,
+            proceso_orden_id=proceso_orden.id,
+            materia_prima_id=materia_prima_id,
+        ).first()
+        if existente:
+            return
+        materia = MateriaPrima.query.get(materia_prima_id)
+        if not materia:
+            return
+        cantidad_real = cantidad_teorica
+        disponible = Decimal(str(materia.stock_actual or 0))
+        if disponible < cantidad_real:
+            raise ValueError("Stock insuficiente")
+        restante = _reservado_restante(orden.id, materia_prima_id)
+        consumo = ConsumoMateriaPrima(
+            orden_produccion_id=orden.id,
+            proceso_orden_id=proceso_orden.id,
+            materia_prima_id=materia_prima_id,
+            cantidad_teorica=cantidad_teorica,
+            cantidad_real=cantidad_real,
+            desperdicio=Decimal("0"),
+            observaciones="Auto-consumo por proceso",
+        )
+        db.session.add(consumo)
+        materia.stock_actual = disponible - cantidad_real
+        liberar = cantidad_real if cantidad_real <= restante else restante
+        materia.stock_reservado = max(
+            Decimal(str(materia.stock_reservado or 0)) - liberar, Decimal("0")
+        )
+
+    def _registrar_consumo_componente_auto(
+        orden: OrdenProduccion,
+        proceso_orden: ProcesoOrden,
+        componente_id: int,
+        cantidad_teorica: Decimal,
+    ):
+        existente = ConsumoProductoComponente.query.filter_by(
+            orden_produccion_id=orden.id,
+            proceso_orden_id=proceso_orden.id,
+            componente_id=componente_id,
+        ).first()
+        if existente:
+            return
+        componente = Producto.query.get(componente_id)
+        if not componente:
+            return
+        cantidad_real = cantidad_teorica
+        disponible = Decimal(str(componente.stock_actual or 0))
+        if disponible < cantidad_real:
+            raise ValueError("Stock insuficiente")
+        restante = _reservado_restante_componente(orden.id, componente_id)
+        consumo = ConsumoProductoComponente(
+            orden_produccion_id=orden.id,
+            proceso_orden_id=proceso_orden.id,
+            componente_id=componente_id,
+            cantidad_teorica=cantidad_teorica,
+            cantidad_real=cantidad_real,
+            desperdicio=Decimal("0"),
+            observaciones="Auto-consumo por proceso",
+        )
+        db.session.add(consumo)
+        componente.stock_actual = disponible - cantidad_real
+        liberar = cantidad_real if cantidad_real <= restante else restante
+        componente.stock_reservado = max(
+            Decimal(str(componente.stock_reservado or 0)) - liberar, Decimal("0")
+        )
+
     @app.route("/materias-primas", methods=["GET"])
     def listar_materias_primas():
         materias = MateriaPrima.query.order_by(MateriaPrima.id).all()
@@ -1852,6 +1935,14 @@ def create_app():
         if materia_prima_id is None:
             return jsonify({"error": "materia_prima_id es requerido"}), 400
         MateriaPrima.query.get_or_404(materia_prima_id)
+        proceso_id = data.get("proceso_id")
+        if proceso_id is not None:
+            Proceso.query.get_or_404(proceso_id)
+            en_ruta = ProductoProceso.query.filter_by(
+                producto_id=producto_id, proceso_id=proceso_id, activo=True
+            ).first()
+            if not en_ruta:
+                return jsonify({"error": "proceso_id no pertenece a la ruta del producto"}), 400
 
         existente = ProductoMateriaPrima.query.filter_by(
             producto_id=producto_id, materia_prima_id=materia_prima_id
@@ -1874,6 +1965,7 @@ def create_app():
         item = ProductoMateriaPrima(
             producto_id=producto_id,
             materia_prima_id=materia_prima_id,
+            proceso_id=proceso_id,
             cantidad_necesaria=cantidad_necesaria,
             merma_estandar=merma_estandar or 0,
             notas=(data.get("notas") or "").strip() or None,
@@ -1912,6 +2004,20 @@ def create_app():
                 item.merma_estandar = _parse_decimal(
                     data.get("merma_estandar"), "merma_estandar"
                 )
+            if "proceso_id" in data:
+                proceso_id = data.get("proceso_id")
+                if proceso_id is None:
+                    item.proceso_id = None
+                else:
+                    Proceso.query.get_or_404(proceso_id)
+                    en_ruta = ProductoProceso.query.filter_by(
+                        producto_id=producto_id, proceso_id=proceso_id, activo=True
+                    ).first()
+                    if not en_ruta:
+                        return jsonify(
+                            {"error": "proceso_id no pertenece a la ruta del producto"}
+                        ), 400
+                    item.proceso_id = proceso_id
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
 
@@ -1946,6 +2052,14 @@ def create_app():
         if componente_id == producto_id:
             return jsonify({"error": "El componente no puede ser el mismo producto"}), 400
         Producto.query.get_or_404(componente_id)
+        proceso_id = data.get("proceso_id")
+        if proceso_id is not None:
+            Proceso.query.get_or_404(proceso_id)
+            en_ruta = ProductoProceso.query.filter_by(
+                producto_id=producto_id, proceso_id=proceso_id, activo=True
+            ).first()
+            if not en_ruta:
+                return jsonify({"error": "proceso_id no pertenece a la ruta del producto"}), 400
 
         existente = ProductoComponente.query.filter_by(
             producto_id=producto_id, componente_id=componente_id
@@ -1968,6 +2082,7 @@ def create_app():
         item = ProductoComponente(
             producto_id=producto_id,
             componente_id=componente_id,
+            proceso_id=proceso_id,
             cantidad_necesaria=cantidad_necesaria,
             merma_estandar=merma_estandar or 0,
             notas=(data.get("notas") or "").strip() or None,
@@ -2014,6 +2129,20 @@ def create_app():
                 item.merma_estandar = _parse_decimal(
                     data.get("merma_estandar"), "merma_estandar"
                 )
+            if "proceso_id" in data:
+                proceso_id = data.get("proceso_id")
+                if proceso_id is None:
+                    item.proceso_id = None
+                else:
+                    Proceso.query.get_or_404(proceso_id)
+                    en_ruta = ProductoProceso.query.filter_by(
+                        producto_id=producto_id, proceso_id=proceso_id, activo=True
+                    ).first()
+                    if not en_ruta:
+                        return jsonify(
+                            {"error": "proceso_id no pertenece a la ruta del producto"}
+                        ), 400
+                    item.proceso_id = proceso_id
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
 
@@ -2587,6 +2716,28 @@ def create_app():
             proceso_orden.fin = datetime.utcnow()
 
         orden = OrdenProduccion.query.get(orden_id)
+        if orden:
+            cantidad_base = _cantidad_base_proceso(proceso_orden, orden)
+            if cantidad_base > 0:
+                mp_items = ProductoMateriaPrima.query.filter_by(
+                    producto_id=orden.producto_id, proceso_id=proceso_orden.proceso_id
+                ).all()
+                comp_items = ProductoComponente.query.filter_by(
+                    producto_id=orden.producto_id, proceso_id=proceso_orden.proceso_id
+                ).all()
+                try:
+                    for item in mp_items:
+                        teorico = _calcular_teorico(item, cantidad_base)
+                        _registrar_consumo_mp_auto(
+                            orden, proceso_orden, item.materia_prima_id, teorico
+                        )
+                    for item in comp_items:
+                        teorico = _calcular_teorico(item, cantidad_base)
+                        _registrar_consumo_componente_auto(
+                            orden, proceso_orden, item.componente_id, teorico
+                        )
+                except ValueError as exc:
+                    return jsonify({"error": str(exc)}), 400
         restantes = ProcesoOrden.query.filter_by(
             orden_produccion_id=orden_id
         ).filter(ProcesoOrden.estado != "COMPLETADO")
