@@ -42,7 +42,7 @@ class Producto(db.Model):
     stock_actual = db.Column(Numeric(12, 4), default=0, nullable=False)
     stock_reservado = db.Column(Numeric(12, 4), default=0, nullable=False)
     stock_minimo = db.Column(Numeric(12, 4), default=0, nullable=False)
-    creado_en = db.Column(db.DateTime, default=datetime.utcnow, nullable=False). nm,
+    creado_en = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     actualizado_en = db.Column(
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
     )
