@@ -1465,7 +1465,6 @@ def create_app():
             "id": materia_prima.id,
             "nombre": materia_prima.nombre,
             "codigo": materia_prima.codigo,
-            "unidad": materia_prima.unidad,
             "costo_unitario": float(materia_prima.costo_unitario or 0),
             "stock_actual": float(materia_prima.stock_actual or 0),
             "stock_reservado": float(materia_prima.stock_reservado or 0),
