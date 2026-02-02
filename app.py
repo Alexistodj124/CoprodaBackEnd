@@ -2631,13 +2631,16 @@ def create_app():
             orden_produccion_id=orden_id, orden=proceso_orden.orden - 1
         ).first()
         if previo and previo.estado != "COMPLETADO":
-            return jsonify({"error": "Debe completar el proceso anterior"}), 400
-
-        activo = ProcesoOrden.query.filter_by(
-            orden_produccion_id=orden_id, estado="EN_PROCESO"
-        ).first()
-        if activo and activo.id != proceso_orden.id:
-            return jsonify({"error": "Ya hay un proceso en curso"}), 400
+            salida_prev = Decimal(str(previo.cantidad_salida or 0))
+            if salida_prev <= 0:
+                return (
+                    jsonify(
+                        {
+                            "error": "Debe registrar salida en el proceso anterior para iniciar este proceso"
+                        }
+                    ),
+                    400,
+                )
 
         proceso_orden.estado = "EN_PROCESO"
         if not proceso_orden.inicio:
@@ -2678,6 +2681,7 @@ def create_app():
             return jsonify({"error": "El proceso no está activo"}), 400
 
         data = request.get_json(silent=True) or {}
+        parcial = _parse_bool(data.get("parcial"), default=False)
         try:
             if "cantidad_entrada" in data:
                 proceso_orden.cantidad_entrada = _parse_decimal(
@@ -2693,6 +2697,24 @@ def create_app():
                 )
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
+
+        previo = ProcesoOrden.query.filter_by(
+            orden_produccion_id=orden_id, orden=proceso_orden.orden - 1
+        ).first()
+        if (
+            previo
+            and proceso_orden.cantidad_entrada is not None
+            and previo.cantidad_salida is not None
+            and proceso_orden.cantidad_entrada > previo.cantidad_salida
+        ):
+            return (
+                jsonify(
+                    {
+                        "error": "cantidad_entrada supera la salida del proceso anterior"
+                    }
+                ),
+                400,
+            )
 
         if proceso_orden.cantidad_perdida is None:
             if (
@@ -2710,6 +2732,10 @@ def create_app():
             proceso_orden.observaciones = (
                 (data.get("observaciones") or "").strip() or None
             )
+
+        if parcial:
+            db.session.commit()
+            return jsonify(proceso_orden_to_dict(proceso_orden))
 
         proceso_orden.estado = "COMPLETADO"
         if not proceso_orden.fin:
