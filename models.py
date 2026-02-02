@@ -273,7 +273,6 @@ class MateriaPrima(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(150), nullable=False)
     codigo = db.Column(db.String(80), unique=True, nullable=False, index=True)
-    unidad = db.Column(db.String(50), nullable=False)
     costo_unitario = db.Column(Numeric(12, 4), default=0, nullable=False)
     stock_actual = db.Column(Numeric(12, 4), default=0, nullable=False)
     stock_reservado = db.Column(Numeric(12, 4), default=0, nullable=False)

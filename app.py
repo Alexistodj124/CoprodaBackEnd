@@ -1782,15 +1782,12 @@ def create_app():
         data = request.get_json(silent=True) or {}
         nombre = (data.get("nombre") or "").strip()
         codigo = (data.get("codigo") or "").strip()
-        unidad = (data.get("unidad") or "").strip()
         activo = _parse_bool(data.get("activo"), default=True)
 
         if not nombre:
             return jsonify({"error": "El nombre es requerido"}), 400
         if not codigo:
             return jsonify({"error": "El código es requerido"}), 400
-        if not unidad:
-            return jsonify({"error": "La unidad es requerida"}), 400
         if MateriaPrima.query.filter_by(codigo=codigo).first():
             return jsonify({"error": "Ya existe una materia prima con ese código"}), 409
 
@@ -1815,7 +1812,6 @@ def create_app():
         materia = MateriaPrima(
             nombre=nombre,
             codigo=codigo,
-            unidad=unidad,
             costo_unitario=costo_unitario or 0,
             stock_actual=stock_actual or 0,
             stock_reservado=stock_reservado or 0,
