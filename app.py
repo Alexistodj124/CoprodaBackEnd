@@ -1427,6 +1427,24 @@ def create_app():
                 return jsonify({"error": str(exc)}), 400
 
         if "estado_id" in data and data.get("estado_id") == 3:
+            if estado_anterior_id != 3:
+                items = OrdenItem.query.filter_by(orden_id=orden.id).all()
+                for item in items:
+                    producto = Producto.query.get(item.producto_id)
+                    if not producto:
+                        return jsonify({"error": "Producto no encontrado"}), 404
+                    disponible = Decimal(str(producto.stock_actual or 0))
+                    cantidad = Decimal(str(item.cantidad or 0))
+                    if disponible < cantidad:
+                        return (
+                            jsonify(
+                                {
+                                    "error": f"Stock insuficiente para {producto.codigo}"
+                                }
+                            ),
+                            400,
+                        )
+                    producto.stock_actual = disponible - cantidad
             cliente = Cliente.query.get(orden.cliente_id)
             if cliente:
                 cliente.saldo = (cliente.saldo or 0) + Decimal(orden.saldo)
