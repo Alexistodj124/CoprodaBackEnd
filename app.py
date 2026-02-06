@@ -1471,6 +1471,13 @@ def create_app():
             cliente = Cliente.query.get(orden.cliente_id)
             if cliente:
                 cliente.saldo = (cliente.saldo or 0) - Decimal(orden.saldo)
+            items = OrdenItem.query.filter_by(orden_id=orden.id).all()
+            for item in items:
+                producto = Producto.query.get(item.producto_id)
+                if producto:
+                    producto.stock_actual = Decimal(
+                        str(producto.stock_actual or 0)
+                    ) + Decimal(str(item.cantidad or 0))
         OrdenItem.query.filter_by(orden_id=orden.id).delete()
         db.session.delete(orden)
         db.session.commit()
