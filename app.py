@@ -1766,6 +1766,17 @@ def create_app():
             Decimal(str(componente.stock_reservado or 0)) - liberar, Decimal("0")
         )
 
+    def _incrementar_stock_producto(orden: OrdenProduccion, cantidad: Decimal):
+        if cantidad is None:
+            return
+        cantidad_val = Decimal(str(cantidad))
+        if cantidad_val <= 0:
+            return
+        producto = Producto.query.get(orden.producto_id)
+        if not producto:
+            return
+        producto.stock_actual = Decimal(str(producto.stock_actual or 0)) + cantidad_val
+
     @app.route("/materias-primas", methods=["GET"])
     def listar_materias_primas():
         materias = MateriaPrima.query.order_by(MateriaPrima.id).all()
@@ -2571,6 +2582,7 @@ def create_app():
     @app.route("/ordenes-produccion/<int:orden_id>/cerrar", methods=["POST"])
     def cerrar_orden_produccion(orden_id: int):
         orden = OrdenProduccion.query.get_or_404(orden_id)
+        estado_previo = orden.estado
         data = request.get_json(silent=True) or {}
         if orden.estado == "CANCELADA":
             return jsonify({"error": "La orden está cancelada"}), 400
@@ -2592,6 +2604,8 @@ def create_app():
             )
             if ultimo and ultimo.cantidad_salida is not None:
                 orden.cantidad_final_buena = ultimo.cantidad_salida
+        if estado_previo != "COMPLETADA":
+            _incrementar_stock_producto(orden, orden.cantidad_final_buena)
         db.session.commit()
         return jsonify(orden_produccion_to_dict(orden, include_detalle=True))
 
@@ -2768,6 +2782,7 @@ def create_app():
                 orden.fecha_fin = datetime.utcnow()
             if orden.cantidad_final_buena is None and proceso_orden.cantidad_salida:
                 orden.cantidad_final_buena = proceso_orden.cantidad_salida
+            _incrementar_stock_producto(orden, orden.cantidad_final_buena)
 
         db.session.commit()
         return jsonify(proceso_orden_to_dict(proceso_orden))
