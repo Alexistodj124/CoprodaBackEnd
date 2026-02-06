@@ -2750,14 +2750,6 @@ def create_app():
                 400,
             )
 
-        if proceso_orden.cantidad_perdida is None:
-            if (
-                proceso_orden.cantidad_entrada is not None
-                and proceso_orden.cantidad_salida is not None
-            ):
-                perdida = proceso_orden.cantidad_entrada - proceso_orden.cantidad_salida
-                proceso_orden.cantidad_perdida = perdida if perdida > 0 else 0
-
         if "motivo_perdida" in data:
             proceso_orden.motivo_perdida = (
                 (data.get("motivo_perdida") or "").strip() or None
