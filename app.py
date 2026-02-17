@@ -600,16 +600,10 @@ def create_app():
         )
 
     def _recalcular_cartera_cliente(cliente_id: int) -> None:
-        """
-        Reaplica todos los pagos (bancos asignados) a las ordenes del cliente.
+        """Reaplica bancos asignados a las ordenes del cliente.
 
-        Esto se usa cuando se elimina una orden con abonos/pagos aplicados para evitar
-        inconsistencias (ordenes con saldo como si el pago siguiera existiendo).
+        Nota: intencionalmente NO modifica Cliente.saldo.
         """
-
-        cliente = Cliente.query.get(cliente_id)
-        if not cliente:
-            return
 
         bancos = (
             Bancos.query.filter_by(cliente_id=cliente_id, asignado=True)
@@ -668,16 +662,7 @@ def create_app():
                     orden.saldo = nuevo_saldo
                 restante -= aplicar
 
-        deuda = Decimal("0.00")
-        for orden in ordenes:
-            if orden.estado_id == 3:
-                deuda += Decimal(str(orden.saldo or 0))
-
-        total_bancos = Decimal("0.00")
-        for banco in bancos:
-            total_bancos += Decimal(str(banco.monto or 0))
-
-        cliente.saldo = deuda - total_bancos
+        # Intencionalmente no se toca cliente.saldo; el saldo se refleja en las ordenes.
 
     def banco_to_dict(banco: Bancos) -> dict:
         return {
@@ -1553,6 +1538,11 @@ def create_app():
     def eliminar_orden(orden_id: int):
         orden = Orden.query.get_or_404(orden_id)
         cliente_id = orden.cliente_id
+
+        if orden.estado_id == 3 and cliente_id:
+            cliente = Cliente.query.get(cliente_id)
+            if cliente:
+                cliente.saldo = (cliente.saldo or 0) - Decimal(str(orden.saldo or 0))
 
         # Restaurar inventario solo si la orden ya se envio (fecha_envio) o esta en estado 3.
         # Esto evita regresar stock en ordenes pagadas sin haber pasado por envio.
