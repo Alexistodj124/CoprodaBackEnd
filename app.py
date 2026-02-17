@@ -583,6 +583,102 @@ def create_app():
         match = re.search(r"\d+", tipo_pago.nombre)
         return int(match.group()) if match else 0
 
+    def _ordenes_ordenadas_para_abono(ordenes, today: date):
+        def _dias_restantes(orden: Orden) -> int:
+            dias_credito = _dias_credito_from_tipo_pago(orden.tipo_pago)
+            fecha_base = orden.fecha_envio or orden.fecha or today
+            vencimiento = fecha_base + timedelta(days=dias_credito)
+            return (vencimiento - today).days
+
+        return sorted(
+            ordenes,
+            key=lambda orden: (
+                _dias_restantes(orden),
+                orden.fecha_envio or orden.fecha or date.min,
+                orden.id,
+            ),
+        )
+
+    def _recalcular_cartera_cliente(cliente_id: int) -> None:
+        """
+        Reaplica todos los pagos (bancos asignados) a las ordenes del cliente.
+
+        Esto se usa cuando se elimina una orden con abonos/pagos aplicados para evitar
+        inconsistencias (ordenes con saldo como si el pago siguiera existiendo).
+        """
+
+        cliente = Cliente.query.get(cliente_id)
+        if not cliente:
+            return
+
+        bancos = (
+            Bancos.query.filter_by(cliente_id=cliente_id, asignado=True)
+            .order_by(Bancos.fecha, Bancos.id)
+            .all()
+        )
+
+        ordenes = Orden.query.filter_by(cliente_id=cliente_id).order_by(Orden.id).all()
+
+        estado_anterior = {o.id: o.estado_id for o in ordenes}
+        fecha_pago_anterior = {o.id: o.fecha_pago for o in ordenes}
+
+        for orden in ordenes:
+            orden.saldo = Decimal(str(orden.total or 0))
+            if orden.estado_id == 4:
+                orden.estado_id = 3
+            orden.fecha_pago = None
+
+        today = date.today()
+
+        for banco in bancos:
+            restante = Decimal(str(banco.monto or 0))
+            if restante <= 0:
+                continue
+
+            fecha_aplicacion = banco.fecha or today
+
+            pendientes = [
+                o
+                for o in ordenes
+                if Decimal(str(o.saldo or 0)) > 0 and o.estado_id != 4
+            ]
+            if not pendientes:
+                break
+
+            ordenes_ordenadas = _ordenes_ordenadas_para_abono(pendientes, today)
+            for orden in ordenes_ordenadas:
+                if restante <= 0:
+                    break
+                saldo_actual = Decimal(str(orden.saldo or 0))
+                if saldo_actual <= 0:
+                    continue
+                aplicar = saldo_actual if saldo_actual <= restante else restante
+                nuevo_saldo = saldo_actual - aplicar
+                if nuevo_saldo <= 0:
+                    orden.saldo = Decimal("0.00")
+                    orden.estado_id = 4
+                    if (
+                        estado_anterior.get(orden.id) == 4
+                        and fecha_pago_anterior.get(orden.id) is not None
+                    ):
+                        orden.fecha_pago = fecha_pago_anterior.get(orden.id)
+                    else:
+                        orden.fecha_pago = fecha_aplicacion
+                else:
+                    orden.saldo = nuevo_saldo
+                restante -= aplicar
+
+        deuda = Decimal("0.00")
+        for orden in ordenes:
+            if orden.estado_id == 3:
+                deuda += Decimal(str(orden.saldo or 0))
+
+        total_bancos = Decimal("0.00")
+        for banco in bancos:
+            total_bancos += Decimal(str(banco.monto or 0))
+
+        cliente.saldo = deuda - total_bancos
+
     def banco_to_dict(banco: Bancos) -> dict:
         return {
             "id": banco.id,
@@ -1456,21 +1552,11 @@ def create_app():
     @app.route("/ordenes/<int:orden_id>", methods=["DELETE"])
     def eliminar_orden(orden_id: int):
         orden = Orden.query.get_or_404(orden_id)
-        total = Decimal(orden.total)
-        saldo = Decimal(orden.saldo)
-        if total != saldo:
-            return (
-                jsonify(
-                    {
-                        "error": "No se puede eliminar la orden porque tiene pagos aplicados"
-                    }
-                ),
-                400,
-            )
-        if orden.estado_id == 3 and orden.cliente_id:
-            cliente = Cliente.query.get(orden.cliente_id)
-            if cliente:
-                cliente.saldo = (cliente.saldo or 0) - Decimal(orden.saldo)
+        cliente_id = orden.cliente_id
+
+        # Restaurar inventario solo si la orden ya se envio (fecha_envio) o esta en estado 3.
+        # Esto evita regresar stock en ordenes pagadas sin haber pasado por envio.
+        if orden.fecha_envio is not None or orden.estado_id == 3:
             items = OrdenItem.query.filter_by(orden_id=orden.id).all()
             for item in items:
                 producto = Producto.query.get(item.producto_id)
@@ -1478,10 +1564,16 @@ def create_app():
                     producto.stock_actual = Decimal(
                         str(producto.stock_actual or 0)
                     ) + Decimal(str(item.cantidad or 0))
+
         OrdenItem.query.filter_by(orden_id=orden.id).delete()
         db.session.delete(orden)
+
+        _recalcular_cartera_cliente(cliente_id)
+
         db.session.commit()
-        return jsonify({"message": "Orden eliminada"})
+        return jsonify(
+            {"message": "Orden eliminada y pagos redistribuidos", "cliente_id": cliente_id}
+        )
 
     # ---------- PRODUCCION ----------
 
