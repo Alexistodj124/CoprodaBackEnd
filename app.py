@@ -1539,10 +1539,13 @@ def create_app():
         orden = Orden.query.get_or_404(orden_id)
         cliente_id = orden.cliente_id
 
-        if orden.estado_id == 3 and cliente_id:
+        if cliente_id:
             cliente = Cliente.query.get(cliente_id)
             if cliente:
-                cliente.saldo = (cliente.saldo or 0) - Decimal(str(orden.saldo or 0))
+                if orden.estado_id == 3:
+                    cliente.saldo = (cliente.saldo or 0) - Decimal(str(orden.saldo or 0))
+                elif orden.estado_id == 4:
+                    cliente.saldo = (cliente.saldo or 0) - Decimal(str(orden.total or 0))
 
         # Restaurar inventario solo si la orden ya se envio (fecha_envio) o esta en estado 3.
         # Esto evita regresar stock en ordenes pagadas sin haber pasado por envio.
