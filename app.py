@@ -184,7 +184,26 @@ def create_app():
 
     @app.route("/productos", methods=["GET"])
     def listar_productos():
-        productos = Producto.query.order_by(Producto.id).all()
+        q = Producto.query
+
+        # Filtros opcionales para vistas de stock (ej: componentes en produccion)
+        if "es_producto_final" in request.args:
+            es_final = _parse_bool(request.args.get("es_producto_final"), default=None)
+            if es_final is not None:
+                q = q.filter(Producto.es_producto_final == es_final)
+
+        if "activo" in request.args:
+            activo = _parse_bool(request.args.get("activo"), default=None)
+            if activo is not None:
+                q = q.filter(Producto.activo == activo)
+
+        # Si solo quieres productos que realmente esten usados como componente
+        if _parse_bool(request.args.get("solo_componentes_usados"), default=False):
+            q = q.join(
+                ProductoComponente, Producto.id == ProductoComponente.componente_id
+            ).distinct()
+
+        productos = q.order_by(Producto.id).all()
         return jsonify([producto_to_dict(p) for p in productos])
 
     @app.route("/productos/<int:producto_id>", methods=["GET"])
