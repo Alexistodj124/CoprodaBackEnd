@@ -170,6 +170,7 @@ def create_app():
             "categoria_id": producto.categoria_id,
             "activo": producto.activo,
             "es_producto_final": producto.es_producto_final,
+            "es_terminado": producto.es_terminado,
             "precio_cf": float(producto.precio_cf),
             "precio_minorista": float(producto.precio_minorista),
             "precio_mayorista": float(producto.precio_mayorista),
@@ -196,6 +197,11 @@ def create_app():
             activo = _parse_bool(request.args.get("activo"), default=None)
             if activo is not None:
                 q = q.filter(Producto.activo == activo)
+
+        if "es_terminado" in request.args:
+            es_terminado = _parse_bool(request.args.get("es_terminado"), default=None)
+            if es_terminado is not None:
+                q = q.filter(Producto.es_terminado == es_terminado)
 
         # Si solo quieres productos que realmente esten usados como componente
         if _parse_bool(request.args.get("solo_componentes_usados"), default=False):
@@ -240,6 +246,7 @@ def create_app():
         es_producto_final = _parse_bool(
             data.get("es_producto_final"), default=True
         )
+        es_terminado = _parse_bool(data.get("es_terminado"), default=None)
         if not nombre:
             return jsonify({"error": "El nombre es requerido"}), 400
         if not codigo:
@@ -277,6 +284,12 @@ def create_app():
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
 
+        if not es_producto_final:
+            es_terminado = False
+        elif es_terminado is None:
+            # Por compatibilidad, si no se especifica se asume TERMINADO.
+            es_terminado = True
+
         producto = Producto(
             nombre=nombre,
             codigo=codigo,
@@ -284,6 +297,7 @@ def create_app():
             categoria_id=categoria_id,
             activo=activo,
             es_producto_final=es_producto_final,
+            es_terminado=es_terminado,
             precio_cf=precio_cf,
             precio_minorista=precio_minorista,
             precio_mayorista=precio_mayorista,
@@ -348,6 +362,15 @@ def create_app():
             producto.es_producto_final = _parse_bool(
                 data.get("es_producto_final"), default=producto.es_producto_final
             )
+            if not producto.es_producto_final:
+                producto.es_terminado = False
+
+        if "es_terminado" in data:
+            producto.es_terminado = _parse_bool(
+                data.get("es_terminado"), default=producto.es_terminado
+            )
+            if not producto.es_producto_final:
+                producto.es_terminado = False
 
         if "unidad_produccion" in data:
             producto.unidad_produccion = (

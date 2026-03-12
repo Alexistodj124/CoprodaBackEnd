@@ -36,6 +36,11 @@ class Producto(db.Model):
     )
     activo = db.Column(db.Boolean, default=True, nullable=False)
     es_producto_final = db.Column(db.Boolean, default=True, nullable=False)
+    # Si es_producto_final=True, este flag permite distinguir agranel vs terminado.
+    # COMPONENTE: es_producto_final=False
+    # AGRANEL: es_producto_final=True, es_terminado=False
+    # TERMINADO: es_producto_final=True, es_terminado=True
+    es_terminado = db.Column(db.Boolean, default=False, nullable=False)
     precio_cf = db.Column(Numeric(12, 2), default=0, nullable=False)
     precio_minorista = db.Column(Numeric(12, 2), default=0, nullable=False)
     precio_mayorista = db.Column(Numeric(12, 2), default=0, nullable=False)
