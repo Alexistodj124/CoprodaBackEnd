@@ -1371,7 +1371,14 @@ def create_app():
 
     @app.route("/ordenes", methods=["GET"])
     def listar_ordenes():
-        ordenes = Orden.query.order_by(Orden.id).all()
+        inicio = request.args.get('inicio')
+        fin = request.args.get('fin')
+        q = Orden.query
+        if inicio:
+            q = q.filter(Orden.fecha >= inicio)
+        if fin:
+            q = q.filter(Orden.fecha <= fin)
+        ordenes = q.order_by(Orden.id).all()
         return jsonify([orden_to_dict(o) for o in ordenes])
 
     @app.route("/ordenes/<int:orden_id>", methods=["GET"])
