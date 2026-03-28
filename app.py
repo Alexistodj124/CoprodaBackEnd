@@ -901,7 +901,7 @@ def create_app():
         ordenes = (
             Orden.query.filter_by(cliente_id=cliente_id)
             .filter(Orden.saldo > 0)
-            .filter(Orden.estado_id != 4)
+            .filter(Orden.estado_id == 3)
             .all()
         )
         if not ordenes:
