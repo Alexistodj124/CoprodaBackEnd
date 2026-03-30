@@ -877,7 +877,6 @@ def create_app():
 
     @app.route("/ordenes/abonos", methods=["POST"])
     def crear_abono_orden():
-        breakpoint()
         data = request.get_json(silent=True) or {}
         cliente_id = data.get("cliente_id")
         banco_id = data.get("banco_id")
