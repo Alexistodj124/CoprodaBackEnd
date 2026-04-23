@@ -1649,9 +1649,13 @@ def create_app():
                         )
                     producto.stock_actual = disponible - cantidad
             cliente = Cliente.query.get(orden.cliente_id)
+            tenia_saldo_a_favor = False
             if cliente:
+                tenia_saldo_a_favor = Decimal(str(cliente.saldo or 0)) < 0
                 cliente.saldo = (cliente.saldo or 0) + Decimal(orden.saldo)
             orden.fecha_envio = date.today()
+            if tenia_saldo_a_favor:
+                _recalcular_cartera_cliente(orden.cliente_id)
 
         db.session.commit()
         return jsonify(orden_to_dict(orden))
