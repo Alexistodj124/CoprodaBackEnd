@@ -3569,7 +3569,10 @@ def create_app():
             cell.alignment = center
 
         rojo_fill = PatternFill(
-            start_color="FDE2E2", end_color="FDE2E2", fill_type="solid"
+            start_color="FFC7CE", end_color="FFC7CE", fill_type="solid"
+        )
+        verde_fill = PatternFill(
+            start_color="C6EFCE", end_color="C6EFCE", fill_type="solid"
         )
         date_fmt = "dd/mm/yyyy"
         money_fmt = "#,##0.00"
@@ -3609,14 +3612,97 @@ def create_app():
                 ws.cell(row=row_idx, column=col).number_format = money_fmt
 
             estado_txt = analisis["estado_pago"].lower()
-            if "fuera de fecha" in estado_txt or "vencido" in estado_txt:
+            fill_row = None
+            if estado_txt == "pagado en fecha":
+                fill_row = verde_fill
+            elif "fuera de fecha" in estado_txt or "vencido" in estado_txt:
+                fill_row = rojo_fill
+            if fill_row is not None:
                 for col_idx in range(1, len(headers) + 1):
-                    ws.cell(row=row_idx, column=col_idx).fill = rojo_fill
+                    ws.cell(row=row_idx, column=col_idx).fill = fill_row
 
         anchos = [20, 28, 14, 14, 18, 14, 16, 18, 14, 20, 22, 20, 16, 14, 14]
         for idx, ancho in enumerate(anchos, start=1):
             ws.column_dimensions[get_column_letter(idx)].width = ancho
         ws.freeze_panes = "A2"
+
+        ws_com = wb.create_sheet(title="Comisiones")
+
+        ws_com["A1"] = "Cálculo de Comisión"
+        ws_com["A1"].font = Font(bold=True, size=14)
+        ws_com.merge_cells("A1:C1")
+
+        ws_com["A2"] = (
+            "Edita los rangos y porcentajes en la tabla. "
+            "Solo cuentan las órdenes con estado \"Pagado en fecha\". "
+            "Deja la celda \"Hasta\" vacía para indicar \"en adelante\"."
+        )
+        ws_com["A2"].font = Font(italic=True, size=10, color="666666")
+        ws_com["A2"].alignment = Alignment(wrap_text=True, vertical="center")
+        ws_com.merge_cells("A2:C2")
+        ws_com.row_dimensions[2].height = 32
+
+        ws_com["A3"] = "Desde (Q)"
+        ws_com["B3"] = "Hasta (Q)"
+        ws_com["C3"] = "Porcentaje %"
+        for col in ("A3", "B3", "C3"):
+            ws_com[col].font = header_font
+            ws_com[col].fill = header_fill
+            ws_com[col].alignment = center
+
+        tier_data = [
+            (500000, 1000000, 0.25),
+            (1000000, 1500000, 0.50),
+            (1500000, None, 0.75),
+        ]
+        tier_start_row = 4
+        tier_end_row = tier_start_row + len(tier_data) - 1
+        for i, (desde, hasta, pct) in enumerate(tier_data, start=tier_start_row):
+            ws_com.cell(row=i, column=1, value=desde).number_format = money_fmt
+            if hasta is not None:
+                ws_com.cell(row=i, column=2, value=hasta).number_format = (
+                    money_fmt
+                )
+            ws_com.cell(row=i, column=3, value=pct).number_format = "0.00"
+
+        total_rows = len(ordenes)
+        last_data_row = max(2, 1 + total_rows)
+
+        resumen_row = tier_end_row + 2
+        ws_com.cell(row=resumen_row, column=1, value="Total pagado en fecha").font = Font(bold=True)
+        cell_total = ws_com.cell(
+            row=resumen_row,
+            column=2,
+            value=(
+                f"=SUMIFS('Órdenes'!N2:N{last_data_row},"
+                f"'Órdenes'!L2:L{last_data_row},\"Pagado en fecha\")"
+            ),
+        )
+        cell_total.number_format = money_fmt
+
+        ws_com.cell(row=resumen_row + 1, column=1, value="Porcentaje aplicado (%)").font = Font(bold=True)
+        cell_total_ref = cell_total.coordinate
+        cell_pct = ws_com.cell(
+            row=resumen_row + 1,
+            column=2,
+            value=(
+                f"=SUMPRODUCT(({cell_total_ref}>=$A${tier_start_row}:$A${tier_end_row})"
+                f"*(({cell_total_ref}<$B${tier_start_row}:$B${tier_end_row})"
+                f"+($B${tier_start_row}:$B${tier_end_row}=\"\"))"
+                f"*$C${tier_start_row}:$C${tier_end_row})"
+            ),
+        )
+        cell_pct.number_format = "0.00"
+
+        ws_com.cell(row=resumen_row + 2, column=1, value="Comisión a pagar (Q)").font = Font(bold=True)
+        ws_com.cell(
+            row=resumen_row + 2,
+            column=2,
+            value=f"={cell_total.coordinate}*{cell_pct.coordinate}/100",
+        ).number_format = money_fmt
+
+        for col, w in zip("ABC", (20, 20, 16)):
+            ws_com.column_dimensions[col].width = w
 
         buffer = BytesIO()
         wb.save(buffer)
