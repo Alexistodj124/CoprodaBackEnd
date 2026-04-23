@@ -760,6 +760,25 @@ def create_app():
 
         # Intencionalmente no se toca cliente.saldo; el saldo se refleja en las ordenes.
 
+    @app.route("/clientes/<int:cliente_id>/recalcular-cartera", methods=["POST"])
+    def recalcular_cartera_cliente_endpoint(cliente_id: int):
+        cliente = Cliente.query.get_or_404(cliente_id)
+        _recalcular_cartera_cliente(cliente.id)
+        db.session.commit()
+
+        ordenes = (
+            Orden.query.filter_by(cliente_id=cliente.id)
+            .order_by(Orden.id)
+            .all()
+        )
+        return jsonify(
+            {
+                "cliente_id": cliente.id,
+                "cliente_saldo": float(cliente.saldo or 0),
+                "ordenes": [orden_to_dict(o) for o in ordenes],
+            }
+        )
+
     def banco_to_dict(banco: Bancos) -> dict:
         return {
             "id": banco.id,
