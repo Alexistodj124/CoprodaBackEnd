@@ -1632,10 +1632,180 @@ def create_app():
             cliente = Cliente.query.get(orden.cliente_id)
             if cliente:
                 cliente.saldo = (cliente.saldo or 0) + Decimal(orden.saldo)
-            orden.fecha_envio = date.today()            
+            orden.fecha_envio = date.today()
 
         db.session.commit()
         return jsonify(orden_to_dict(orden))
+
+    @app.route("/ordenes/<int:orden_id>/split", methods=["POST"])
+    def dividir_orden(orden_id: int):
+        orden = Orden.query.get_or_404(orden_id)
+
+        if orden.estado_id != 2:
+            return (
+                jsonify(
+                    {"error": "Solo se pueden dividir órdenes confirmadas en bodega"}
+                ),
+                400,
+            )
+
+        data = request.get_json(silent=True) or {}
+        payload_items = data.get("items")
+        if not isinstance(payload_items, list) or not payload_items:
+            return jsonify({"error": "items debe ser una lista no vacía"}), 400
+
+        items_actuales = OrdenItem.query.filter_by(orden_id=orden.id).all()
+        items_por_id = {item.id: item for item in items_actuales}
+
+        ids_enviados = set()
+        envios = {}
+        for entry in payload_items:
+            if not isinstance(entry, dict):
+                return jsonify({"error": "Cada item debe ser un objeto"}), 400
+            item_id = entry.get("id")
+            cantidad_envio = entry.get("cantidad_envio")
+            if item_id not in items_por_id:
+                return (
+                    jsonify(
+                        {"error": f"item id {item_id} no pertenece a la orden"}
+                    ),
+                    400,
+                )
+            try:
+                cantidad_envio_int = int(cantidad_envio)
+            except (TypeError, ValueError):
+                return (
+                    jsonify(
+                        {"error": "cantidad_envio debe ser un entero"}
+                    ),
+                    400,
+                )
+            if cantidad_envio_int < 0:
+                return (
+                    jsonify({"error": "cantidad_envio no puede ser negativa"}),
+                    400,
+                )
+            cantidad_original = int(items_por_id[item_id].cantidad or 0)
+            if cantidad_envio_int > cantidad_original:
+                return (
+                    jsonify(
+                        {
+                            "error": (
+                                f"cantidad_envio ({cantidad_envio_int}) mayor "
+                                f"que la cantidad original ({cantidad_original})"
+                            )
+                        }
+                    ),
+                    400,
+                )
+            if item_id in ids_enviados:
+                return (
+                    jsonify({"error": f"item id {item_id} duplicado"}),
+                    400,
+                )
+            ids_enviados.add(item_id)
+            envios[item_id] = cantidad_envio_int
+
+        if ids_enviados != set(items_por_id.keys()):
+            faltantes = set(items_por_id.keys()) - ids_enviados
+            return (
+                jsonify(
+                    {
+                        "error": (
+                            "Faltan items en la petición: "
+                            f"{sorted(faltantes)}"
+                        )
+                    }
+                ),
+                400,
+            )
+
+        suma_envio = sum(envios.values())
+        if suma_envio <= 0:
+            return (
+                jsonify({"error": "Al menos 1 unidad debe enviarse"}),
+                400,
+            )
+
+        items_remanente = []
+        for item in items_actuales:
+            cantidad_original = int(item.cantidad or 0)
+            cantidad_envio = envios[item.id]
+            remanente = cantidad_original - cantidad_envio
+            if remanente > 0:
+                items_remanente.append(
+                    {
+                        "producto_id": item.producto_id,
+                        "precio": Decimal(str(item.precio)),
+                        "cantidad": remanente,
+                    }
+                )
+
+        if not items_remanente:
+            return (
+                jsonify(
+                    {"error": "No hay nada que dividir, usa Confirmar"}
+                ),
+                400,
+            )
+
+        for item in items_actuales:
+            cantidad_envio = envios[item.id]
+            if cantidad_envio == 0:
+                db.session.delete(item)
+            else:
+                item.cantidad = cantidad_envio
+
+        db.session.flush()
+
+        items_actualizados = OrdenItem.query.filter_by(orden_id=orden.id).all()
+        orden.total = sum(
+            Decimal(str(it.precio)) * Decimal(str(it.cantidad))
+            for it in items_actualizados
+        )
+        orden.saldo = orden.total
+
+        cliente = Cliente.query.get(orden.cliente_id)
+        if not cliente or not cliente.codigo:
+            return jsonify({"error": "Cliente de la orden no válido"}), 400
+
+        total_remanente = sum(
+            it["precio"] * Decimal(str(it["cantidad"])) for it in items_remanente
+        )
+
+        nueva = Orden(
+            codigo_orden=_generar_codigo_orden(cliente.codigo.strip()),
+            fecha=date.today(),
+            fecha_envio=None,
+            fecha_pago=None,
+            usuario_id=orden.usuario_id,
+            tipo_pago_id=orden.tipo_pago_id,
+            estado_id=2,
+            cliente_id=orden.cliente_id,
+            total=total_remanente,
+            saldo=total_remanente,
+        )
+        db.session.add(nueva)
+        db.session.flush()
+
+        for item in items_remanente:
+            db.session.add(
+                OrdenItem(
+                    orden_id=nueva.id,
+                    producto_id=item["producto_id"],
+                    precio=item["precio"],
+                    cantidad=item["cantidad"],
+                )
+            )
+
+        db.session.commit()
+
+        return jsonify(
+            {
+                "orden_actual": orden_to_dict(orden),
+                "orden_sobrante": orden_to_dict(nueva),
+            }
+        )
 
     @app.route("/ordenes/<int:orden_id>", methods=["DELETE"])
     def eliminar_orden(orden_id: int):
