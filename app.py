@@ -1,12 +1,17 @@
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+from io import BytesIO
 import re
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 from flask_migrate import Migrate
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
 from werkzeug.wrappers import Response
+
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
 
 from config import Config
 from models import (
@@ -640,6 +645,55 @@ def create_app():
                 orden.id,
             ),
         )
+
+    def _es_contado(tipo_pago: TipoPago) -> bool:
+        if not tipo_pago or not tipo_pago.nombre:
+            return False
+        return "contado" in tipo_pago.nombre.lower()
+
+    def _dias_gracia(tipo_pago: TipoPago) -> int:
+        if _es_contado(tipo_pago):
+            return 5
+        dias_credito = _dias_credito_from_tipo_pago(tipo_pago)
+        return dias_credito + 2 if dias_credito > 0 else 0
+
+    def _analizar_pago_orden(orden: Orden, today: date) -> dict:
+        fecha_base = orden.fecha_envio or orden.fecha
+        dias_gracia = _dias_gracia(orden.tipo_pago)
+        fecha_limite = (
+            fecha_base + timedelta(days=dias_gracia) if fecha_base else None
+        )
+
+        if orden.fecha_pago and fecha_base:
+            dias_tardo = (orden.fecha_pago - fecha_base).days
+            dias_vs_limite = (orden.fecha_pago - fecha_limite).days
+            estado_pago = (
+                "Pagado en fecha"
+                if dias_vs_limite <= 0
+                else "Pagado fuera de fecha"
+            )
+        elif fecha_base and fecha_limite:
+            dias_tardo = None
+            dias_vs_limite = (today - fecha_limite).days
+            estado_pago = (
+                "Pendiente vencido"
+                if dias_vs_limite > 0
+                else "Pendiente en fecha"
+            )
+        else:
+            dias_tardo = None
+            dias_vs_limite = None
+            estado_pago = "Sin fecha base"
+
+        return {
+            "fecha_base": fecha_base,
+            "dias_credito": _dias_credito_from_tipo_pago(orden.tipo_pago),
+            "dias_gracia": dias_gracia,
+            "fecha_limite": fecha_limite,
+            "dias_tardo_en_pagar": dias_tardo,
+            "dias_vs_limite": dias_vs_limite,
+            "estado_pago": estado_pago,
+        }
 
     def _recalcular_cartera_cliente(cliente_id: int) -> None:
         """Reaplica bancos asignados a las ordenes del cliente.
@@ -3440,6 +3494,144 @@ def create_app():
             for p in procesos
         ]
         return jsonify(respuesta)
+
+    @app.route("/reportes/ordenes/excel", methods=["GET"])
+    def reporte_ordenes_excel():
+        inicio = request.args.get("inicio")
+        fin = request.args.get("fin")
+        estado_ids_raw = request.args.get("estado_ids")
+        cliente_id = request.args.get("cliente_id")
+        usuario_id = request.args.get("usuario_id")
+
+        q = Orden.query
+        if inicio:
+            q = q.filter(Orden.fecha >= inicio)
+        if fin:
+            q = q.filter(Orden.fecha <= fin)
+        if estado_ids_raw:
+            try:
+                estado_ids = [
+                    int(x) for x in estado_ids_raw.split(",") if x.strip()
+                ]
+            except ValueError:
+                return jsonify({"error": "estado_ids inválido"}), 400
+            if estado_ids:
+                q = q.filter(Orden.estado_id.in_(estado_ids))
+        if cliente_id:
+            try:
+                q = q.filter(Orden.cliente_id == int(cliente_id))
+            except ValueError:
+                return jsonify({"error": "cliente_id inválido"}), 400
+        if usuario_id:
+            try:
+                uid = int(usuario_id)
+            except ValueError:
+                return jsonify({"error": "usuario_id inválido"}), 400
+            q = q.join(Cliente, Orden.cliente_id == Cliente.id).filter(
+                Cliente.usuario_id == uid
+            )
+
+        ordenes = q.order_by(Orden.fecha, Orden.id).all()
+        today = date.today()
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Órdenes"
+
+        headers = [
+            "Código de orden",
+            "Cliente",
+            "Fecha orden",
+            "Fecha envío",
+            "Tipo de pago",
+            "Días crédito",
+            "Días de gracia",
+            "Fecha límite de pago",
+            "Fecha pago",
+            "Días que tardó en pagar",
+            "Días pasados del límite",
+            "Estado de pago",
+            "Estado orden",
+            "Total",
+            "Saldo",
+        ]
+        ws.append(headers)
+
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(
+            start_color="4F4F4F", end_color="4F4F4F", fill_type="solid"
+        )
+        center = Alignment(horizontal="center", vertical="center")
+        for col_idx, _ in enumerate(headers, start=1):
+            cell = ws.cell(row=1, column=col_idx)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = center
+
+        rojo_fill = PatternFill(
+            start_color="FDE2E2", end_color="FDE2E2", fill_type="solid"
+        )
+        date_fmt = "DD/MM/YYYY"
+        money_fmt = "#,##0.00"
+
+        for orden in ordenes:
+            analisis = _analizar_pago_orden(orden, today)
+            cliente_nombre = orden.cliente.nombre if orden.cliente else ""
+            tipo_pago_nombre = (
+                orden.tipo_pago.nombre if orden.tipo_pago else ""
+            )
+            estado_nombre = orden.estado.nombre if orden.estado else ""
+
+            ws.append(
+                [
+                    orden.codigo_orden or orden.id,
+                    cliente_nombre,
+                    orden.fecha,
+                    orden.fecha_envio,
+                    tipo_pago_nombre,
+                    analisis["dias_credito"],
+                    analisis["dias_gracia"],
+                    analisis["fecha_limite"],
+                    orden.fecha_pago,
+                    analisis["dias_tardo_en_pagar"],
+                    analisis["dias_vs_limite"],
+                    analisis["estado_pago"],
+                    estado_nombre,
+                    float(orden.total or 0),
+                    float(orden.saldo or 0),
+                ]
+            )
+
+            row_idx = ws.max_row
+            for col in (3, 4, 8, 9):
+                ws.cell(row=row_idx, column=col).number_format = date_fmt
+            for col in (14, 15):
+                ws.cell(row=row_idx, column=col).number_format = money_fmt
+
+            estado_txt = analisis["estado_pago"].lower()
+            if "fuera de fecha" in estado_txt or "vencido" in estado_txt:
+                for col_idx in range(1, len(headers) + 1):
+                    ws.cell(row=row_idx, column=col_idx).fill = rojo_fill
+
+        anchos = [20, 28, 14, 14, 18, 14, 16, 18, 14, 20, 22, 20, 16, 14, 14]
+        for idx, ancho in enumerate(anchos, start=1):
+            ws.column_dimensions[get_column_letter(idx)].width = ancho
+        ws.freeze_panes = "A2"
+
+        buffer = BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+
+        filename = f"reporte_ordenes_{today.isoformat()}.xlsx"
+        return send_file(
+            buffer,
+            mimetype=(
+                "application/vnd.openxmlformats-officedocument"
+                ".spreadsheetml.sheet"
+            ),
+            as_attachment=True,
+            download_name=filename,
+        )
 
     prefix = app.config.get("URL_PREFIX", "/coproda")
     if prefix:
