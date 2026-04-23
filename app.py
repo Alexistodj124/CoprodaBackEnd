@@ -3571,7 +3571,7 @@ def create_app():
         rojo_fill = PatternFill(
             start_color="FDE2E2", end_color="FDE2E2", fill_type="solid"
         )
-        date_fmt = "DD/MM/YYYY"
+        date_fmt = "dd/mm/yyyy"
         money_fmt = "#,##0.00"
 
         for orden in ordenes:
