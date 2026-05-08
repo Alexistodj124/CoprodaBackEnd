@@ -2793,7 +2793,15 @@ def create_app():
         if not ruta:
             return jsonify({"error": "El producto no tiene ruta de procesos"}), 400
 
-        for item in bom_items:
+        first_proceso_id = ruta[0].proceso_id
+
+        def _para_primer_proceso(it):
+            return it.proceso_id == first_proceso_id or it.proceso_id is None
+
+        bom_items_iniciales = [i for i in bom_items if _para_primer_proceso(i)]
+        componentes_iniciales = [i for i in componentes if _para_primer_proceso(i)]
+
+        for item in bom_items_iniciales:
             materia = MateriaPrima.query.get(item.materia_prima_id)
             if not materia:
                 return jsonify({"error": "Materia prima no encontrada en BOM"}), 404
@@ -2813,7 +2821,7 @@ def create_app():
                     400,
                 )
 
-        for item in componentes:
+        for item in componentes_iniciales:
             componente = Producto.query.get(item.componente_id)
             if not componente:
                 return jsonify({"error": "Componente no encontrado en producto"}), 404
@@ -2844,7 +2852,7 @@ def create_app():
         db.session.add(orden)
         db.session.flush()
 
-        for item in bom_items:
+        for item in bom_items_iniciales:
             teorico = _calcular_teorico(item, cantidad_planeada)
             consumo = ConsumoMateriaPrima(
                 orden_produccion_id=orden.id,
@@ -2855,7 +2863,7 @@ def create_app():
             materia = MateriaPrima.query.get(item.materia_prima_id)
             materia.stock_reservado = Decimal(str(materia.stock_reservado or 0)) + teorico
 
-        for item in componentes:
+        for item in componentes_iniciales:
             teorico = _calcular_teorico(item, cantidad_planeada)
             consumo = ConsumoProductoComponente(
                 orden_produccion_id=orden.id,
@@ -3057,6 +3065,97 @@ def create_app():
                     400,
                 )
 
+        # Para procesos posteriores al primero: validar y reservar stock al iniciarlo.
+        # El primer proceso ya fue validado y reservado al crear la orden.
+        if previo is not None and proceso_orden.estado == "PENDIENTE":
+            orden = OrdenProduccion.query.get(orden_id)
+            cantidad_planeada = Decimal(str(orden.cantidad_planeada or 0)) if orden else Decimal("0")
+
+            mp_items_proc = ProductoMateriaPrima.query.filter_by(
+                producto_id=orden.producto_id, proceso_id=proceso_orden.proceso_id
+            ).all() if orden else []
+            comp_items_proc = ProductoComponente.query.filter_by(
+                producto_id=orden.producto_id, proceso_id=proceso_orden.proceso_id
+            ).all() if orden else []
+
+            for item in mp_items_proc:
+                materia = MateriaPrima.query.get(item.materia_prima_id)
+                if not materia:
+                    continue
+                teorico = _calcular_teorico(item, cantidad_planeada)
+                disponible = Decimal(str(materia.stock_actual or 0)) - Decimal(
+                    str(materia.stock_reservado or 0)
+                )
+                if disponible < teorico:
+                    return (
+                        jsonify(
+                            {
+                                "error": f"Stock insuficiente para {materia.codigo}",
+                                "disponible": float(disponible),
+                                "requerido": float(teorico),
+                            }
+                        ),
+                        400,
+                    )
+
+            for item in comp_items_proc:
+                componente = Producto.query.get(item.componente_id)
+                if not componente:
+                    continue
+                teorico = _calcular_teorico(item, cantidad_planeada)
+                disponible = Decimal(str(componente.stock_actual or 0)) - Decimal(
+                    str(componente.stock_reservado or 0)
+                )
+                if disponible < teorico:
+                    return (
+                        jsonify(
+                            {
+                                "error": f"Stock insuficiente para {componente.codigo}",
+                                "disponible": float(disponible),
+                                "requerido": float(teorico),
+                            }
+                        ),
+                        400,
+                    )
+
+            for item in mp_items_proc:
+                ya_reservado = ConsumoMateriaPrima.query.filter_by(
+                    orden_produccion_id=orden_id,
+                    proceso_orden_id=None,
+                    materia_prima_id=item.materia_prima_id,
+                ).first()
+                if ya_reservado:
+                    continue
+                teorico = _calcular_teorico(item, cantidad_planeada)
+                consumo = ConsumoMateriaPrima(
+                    orden_produccion_id=orden_id,
+                    materia_prima_id=item.materia_prima_id,
+                    cantidad_teorica=teorico,
+                )
+                db.session.add(consumo)
+                materia = MateriaPrima.query.get(item.materia_prima_id)
+                materia.stock_reservado = Decimal(str(materia.stock_reservado or 0)) + teorico
+
+            for item in comp_items_proc:
+                ya_reservado = ConsumoProductoComponente.query.filter_by(
+                    orden_produccion_id=orden_id,
+                    proceso_orden_id=None,
+                    componente_id=item.componente_id,
+                ).first()
+                if ya_reservado:
+                    continue
+                teorico = _calcular_teorico(item, cantidad_planeada)
+                consumo = ConsumoProductoComponente(
+                    orden_produccion_id=orden_id,
+                    componente_id=item.componente_id,
+                    cantidad_teorica=teorico,
+                )
+                db.session.add(consumo)
+                componente = Producto.query.get(item.componente_id)
+                componente.stock_reservado = Decimal(
+                    str(componente.stock_reservado or 0)
+                ) + teorico
+
         proceso_orden.estado = "EN_PROCESO"
         if not proceso_orden.inicio:
             proceso_orden.inicio = datetime.utcnow()
@@ -3143,6 +3242,63 @@ def create_app():
         if parcial:
             db.session.commit()
             return jsonify(proceso_orden_to_dict(proceso_orden))
+
+        # Antes de marcar COMPLETADO: si hay un proceso siguiente PENDIENTE,
+        # validar que tenga stock suficiente. Si no, guardar los campos
+        # actualizados (como parcial) y devolver 400 — el proceso actual NO
+        # se completa para evitar quedar trabados sin poder iniciar el siguiente.
+        siguiente = ProcesoOrden.query.filter_by(
+            orden_produccion_id=orden_id, orden=proceso_orden.orden + 1
+        ).first()
+        if siguiente and siguiente.estado == "PENDIENTE":
+            orden_actual = OrdenProduccion.query.get(orden_id)
+            if orden_actual:
+                cantidad_planeada_sig = Decimal(str(orden_actual.cantidad_planeada or 0))
+                mp_items_sig = ProductoMateriaPrima.query.filter_by(
+                    producto_id=orden_actual.producto_id,
+                    proceso_id=siguiente.proceso_id,
+                ).all()
+                comp_items_sig = ProductoComponente.query.filter_by(
+                    producto_id=orden_actual.producto_id,
+                    proceso_id=siguiente.proceso_id,
+                ).all()
+
+                error_stock = None
+                for item in mp_items_sig:
+                    materia = MateriaPrima.query.get(item.materia_prima_id)
+                    if not materia:
+                        continue
+                    teorico = _calcular_teorico(item, cantidad_planeada_sig)
+                    disponible = Decimal(str(materia.stock_actual or 0)) - Decimal(
+                        str(materia.stock_reservado or 0)
+                    )
+                    if disponible < teorico:
+                        error_stock = {
+                            "error": f"Stock insuficiente para {materia.codigo} (proceso siguiente)",
+                            "disponible": float(disponible),
+                            "requerido": float(teorico),
+                        }
+                        break
+                if error_stock is None:
+                    for item in comp_items_sig:
+                        componente = Producto.query.get(item.componente_id)
+                        if not componente:
+                            continue
+                        teorico = _calcular_teorico(item, cantidad_planeada_sig)
+                        disponible = Decimal(str(componente.stock_actual or 0)) - Decimal(
+                            str(componente.stock_reservado or 0)
+                        )
+                        if disponible < teorico:
+                            error_stock = {
+                                "error": f"Stock insuficiente para {componente.codigo} (proceso siguiente)",
+                                "disponible": float(disponible),
+                                "requerido": float(teorico),
+                            }
+                            break
+
+                if error_stock is not None:
+                    db.session.rollback()
+                    return jsonify(error_stock), 400
 
         proceso_orden.estado = "COMPLETADO"
         if not proceso_orden.fin:
