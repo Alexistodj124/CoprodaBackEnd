@@ -246,7 +246,7 @@ class Orden(db.Model):
     estado = db.relationship("EstadoOrden", back_populates="ordenes")
     cliente = db.relationship("Cliente", back_populates="ordenes")
     usuario = db.relationship("Usuario", back_populates="ordenes")
-    items = db.relationship("OrdenItem", back_populates="orden", lazy="dynamic")
+    items = db.relationship("OrdenItem", back_populates="orden", lazy="selectin")
 
     def __repr__(self) -> str:
         return f"<Orden {self.id}>"
