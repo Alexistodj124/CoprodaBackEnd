@@ -3341,6 +3341,136 @@ def create_app():
         db.session.commit()
         return jsonify(proceso_orden_to_dict(proceso_orden))
 
+    @app.route(
+        "/ordenes-produccion/<int:orden_id>/procesos/cantidades",
+        methods=["PUT"],
+    )
+    def editar_cantidades_procesos_orden(orden_id: int):
+        """
+        Edición correctiva de las cantidades de los procesos de UNA orden,
+        aplicada en una sola transacción (todo o nada).
+
+        No inicia ni completa procesos, no registra consumos y no toca
+        stock ni reservas: solo ajusta entrada/salida/pérdida manteniendo
+        la cadena (la entrada de cada proceso = salida del anterior) y
+        re-deriva estados: un COMPLETADO que deja de estar lleno se reabre
+        a EN_PROCESO (al recompletarlo por el flujo normal, los consumos
+        automáticos no se duplican porque ese registro es idempotente).
+        Los procesos PENDIENTE no se editan: sus cantidades se fijan al
+        iniciarlos por el flujo normal.
+        """
+        orden = OrdenProduccion.query.get_or_404(orden_id)
+        if orden.estado in {"COMPLETADA", "CANCELADA"}:
+            return (
+                jsonify(
+                    {"error": "No se puede editar una orden completada o cancelada"}
+                ),
+                400,
+            )
+
+        data = request.get_json(silent=True) or {}
+        items = data.get("procesos")
+        if not isinstance(items, list) or not items:
+            return jsonify({"error": "procesos debe ser una lista no vacía"}), 400
+
+        procesos = (
+            ProcesoOrden.query.filter_by(orden_produccion_id=orden_id)
+            .order_by(ProcesoOrden.orden)
+            .all()
+        )
+        por_id = {p.id: p for p in procesos}
+
+        cambios = {}
+        for item in items:
+            if not isinstance(item, dict):
+                return jsonify({"error": "Cada proceso debe ser un objeto"}), 400
+            pid = item.get("proceso_orden_id")
+            proceso = por_id.get(pid)
+            if not proceso:
+                return (
+                    jsonify(
+                        {"error": f"proceso_orden_id {pid} no pertenece a la orden"}
+                    ),
+                    400,
+                )
+            if proceso.estado == "PENDIENTE":
+                return (
+                    jsonify(
+                        {
+                            "error": (
+                                "Solo se pueden editar procesos ya iniciados; "
+                                f"el proceso {proceso.orden} está pendiente"
+                            )
+                        }
+                    ),
+                    400,
+                )
+            cambio = {}
+            try:
+                if "cantidad_salida" in item:
+                    cambio["salida"] = _parse_decimal(
+                        item.get("cantidad_salida"),
+                        "cantidad_salida",
+                        default=Decimal("0"),
+                    ) or Decimal("0")
+                if "cantidad_perdida" in item:
+                    cambio["perdida"] = _parse_decimal(
+                        item.get("cantidad_perdida"),
+                        "cantidad_perdida",
+                        default=Decimal("0"),
+                    ) or Decimal("0")
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
+            for valor in cambio.values():
+                if valor < 0:
+                    return (
+                        jsonify({"error": "Las cantidades no pueden ser negativas"}),
+                        400,
+                    )
+            cambios[pid] = cambio
+
+        # Recalcular la cadena sobre los procesos ya iniciados. Se corta en
+        # el primer PENDIENTE (la cola de la orden) sin tocarlo.
+        entrada_encadenada = None
+        for proceso in procesos:
+            if proceso.estado == "PENDIENTE":
+                break
+            cambio = cambios.get(proceso.id, {})
+            salida = cambio.get(
+                "salida", Decimal(str(proceso.cantidad_salida or 0))
+            )
+            perdida = cambio.get(
+                "perdida", Decimal(str(proceso.cantidad_perdida or 0))
+            )
+            entrada = (
+                Decimal(str(proceso.cantidad_entrada or 0))
+                if entrada_encadenada is None
+                else entrada_encadenada
+            )
+            if salida + perdida > entrada:
+                db.session.rollback()
+                return (
+                    jsonify(
+                        {
+                            "error": (
+                                f"En el proceso {proceso.orden}, salida + pérdida "
+                                f"({salida + perdida}) supera la entrada ({entrada})"
+                            )
+                        }
+                    ),
+                    400,
+                )
+            proceso.cantidad_entrada = entrada
+            proceso.cantidad_salida = salida
+            proceso.cantidad_perdida = perdida
+            if proceso.estado == "COMPLETADO" and salida < entrada - perdida:
+                proceso.estado = "EN_PROCESO"
+                proceso.fin = None
+            entrada_encadenada = salida
+
+        db.session.commit()
+        return jsonify([proceso_orden_to_dict(p) for p in procesos])
+
     @app.route("/ordenes-produccion/<int:orden_id>/consumos", methods=["GET"])
     def listar_consumos_orden(orden_id: int):
         OrdenProduccion.query.get_or_404(orden_id)
