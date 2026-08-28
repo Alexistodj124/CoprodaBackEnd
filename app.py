@@ -1630,7 +1630,14 @@ def create_app():
                 return jsonify({"error": str(exc)}), 400
 
         if "estado_id" in data and data.get("estado_id") == 3:
-            if estado_anterior_id != 3:
+            # Los efectos del envio (descontar stock, sumar al saldo del cliente y
+            # sellar fecha_envio) solo deben correr en la transicion real a envio.
+            # Si la orden ya estaba en 3, este PUT es un reenvio (p.ej. dos equipos
+            # confirmando la misma orden en Bodega) y repetirlos duplicaba el saldo
+            # del cliente. Si estaba en 4, es una reversion manual desde Reportes:
+            # se permite el cambio de estado, pero sin volver a descontar inventario
+            # ni pisar la fecha de envio original.
+            if estado_anterior_id not in (3, 4):
                 items = OrdenItem.query.filter_by(orden_id=orden.id).all()
                 for item in items:
                     producto = Producto.query.get(item.producto_id)
@@ -1648,14 +1655,14 @@ def create_app():
                             400,
                         )
                     producto.stock_actual = disponible - cantidad
-            cliente = Cliente.query.get(orden.cliente_id)
-            tenia_saldo_a_favor = False
-            if cliente:
-                tenia_saldo_a_favor = Decimal(str(cliente.saldo or 0)) < 0
-                cliente.saldo = (cliente.saldo or 0) + Decimal(orden.saldo)
-            orden.fecha_envio = date.today()
-            if tenia_saldo_a_favor:
-                _recalcular_cartera_cliente(orden.cliente_id)
+                cliente = Cliente.query.get(orden.cliente_id)
+                tenia_saldo_a_favor = False
+                if cliente:
+                    tenia_saldo_a_favor = Decimal(str(cliente.saldo or 0)) < 0
+                    cliente.saldo = (cliente.saldo or 0) + Decimal(orden.saldo)
+                orden.fecha_envio = date.today()
+                if tenia_saldo_a_favor:
+                    _recalcular_cartera_cliente(orden.cliente_id)
 
         db.session.commit()
         return jsonify(orden_to_dict(orden))
