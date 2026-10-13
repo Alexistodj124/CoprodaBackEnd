@@ -9,21 +9,21 @@ import os
 
 
 class Settings:
-    # --- OpenRouter ---
-    OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
-    OPENROUTER_BASE_URL = os.getenv(
-        "OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"
-    )
+    # --- Modelo ---
+    # "suscripcion": Claude Agent SDK sobre la sesion de Claude Code (`claude auth
+    #                login`), sin API key. Solo para pruebas locales.
+    # "api":         Messages API con ANTHROPIC_API_KEY.
+    BACKEND = os.getenv("AGENTE_BACKEND", "suscripcion").strip().lower()
+    ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
     # Tool-calling confiable es lo unico que importa aqui: si el modelo elige mal
     # la herramienta o se salta fecha_hoy, la respuesta sale mal aunque suene bien.
-    MODELO = os.getenv("OPENROUTER_MODELO", "anthropic/claude-opus-5")
-    # Las respuestas son de WhatsApp: cortas. Esto solo evita que se corte a medias.
-    MAX_TOKENS = int(os.getenv("OPENROUTER_MAX_TOKENS", "2000"))
-    # Opus 5, Sonnet 5 y Fable 5 ya no aceptan temperature. Dejala vacia salvo que
-    # uses un modelo viejo (Sonnet 4.6, Haiku 4.5) donde si aplica.
-    _temp = os.getenv("OPENROUTER_TEMPERATURA", "").strip()
-    TEMPERATURA = float(_temp) if _temp else None
-    TIMEOUT_LLM = int(os.getenv("OPENROUTER_TIMEOUT", "90"))
+    MODELO = os.getenv("AGENTE_MODELO", "claude-opus-5")
+    # Opus 5 piensa por defecto y max_tokens cubre pensamiento + respuesta, asi
+    # que hay que dejar holgura aunque la respuesta de WhatsApp sea corta.
+    MAX_TOKENS = int(os.getenv("AGENTE_MAX_TOKENS", "16000"))
+    # low | medium | high | xhigh | max. Vacio = default del modelo (high en Opus 5).
+    EFFORT = os.getenv("AGENTE_EFFORT", "").strip() or None
+    TIMEOUT_LLM = int(os.getenv("AGENTE_TIMEOUT_LLM", "120"))
 
     # --- Backend Coproda (solo lectura) ---
     API_BASE_URL = os.getenv("COPRODA_API_URL", "https://coprodasa.com/api4/coproda")
@@ -34,6 +34,17 @@ class Settings:
     MAX_ITERACIONES = int(os.getenv("AGENTE_MAX_ITERACIONES", "6"))
     MAX_MENSAJES_HISTORIAL = int(os.getenv("AGENTE_MAX_HISTORIAL", "20"))
     DEBUG = os.getenv("AGENTE_DEBUG", "0") == "1"
+
+    # --- WhatsApp Cloud API (channels/whatsapp.py) ---
+    WA_PHONE_NUMBER_ID = os.getenv("WA_PHONE_NUMBER_ID", "")
+    WA_TOKEN = os.getenv("WA_TOKEN", "")
+    WA_VERIFY_TOKEN = os.getenv("WA_VERIFY_TOKEN", "")
+    # Vacio = no se verifica X-Hub-Signature-256. Solo aceptable en pruebas.
+    WA_APP_SECRET = os.getenv("WA_APP_SECRET", "")
+    # Telefonos (con codigo de pais, sin +) separados por coma.
+    WA_NUMEROS_PERMITIDOS = os.getenv("WA_NUMEROS_PERMITIDOS", "")
+    WA_GRAPH_VERSION = os.getenv("WA_GRAPH_VERSION", "v25.0")
+    WA_PORT = int(os.getenv("WA_PORT", "8000"))
 
     # --- Roles ---
     # Mapea nombres de permisos del backend -> rol del agente.

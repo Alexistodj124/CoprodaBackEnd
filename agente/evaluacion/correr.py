@@ -4,7 +4,7 @@ import sys, os, json, time, argparse
 AG = "/Users/alexismesias/Documents/Codes/CoprodaBackEnd/agente"
 sys.path.insert(0, AG)
 from dotenv import load_dotenv; load_dotenv(os.path.join(AG, ".env"))
-from agent import Agente, OpenRouter, Sesion
+from agent import Sesion, crear_agente
 from backend.client import CoprodaClient
 from tools.base import Contexto
 from settings import settings
@@ -18,7 +18,7 @@ a = ap.parse_args()
 
 casos = json.load(open(os.path.join(SPD, "casos.json"), encoding="utf8"))["casos"]
 casos = [c for c in casos if a.desde <= c["n"] <= a.hasta]
-print(f"modelo: {settings.MODELO} | casos: {len(casos)}")
+print(f"modelo: {settings.MODELO} | backend: {settings.BACKEND} | casos: {len(casos)}")
 
 api = CoprodaClient()
 ctx = Contexto(api=api, usuario_id=None, usuario="evaluacion", rol="admin")
@@ -27,15 +27,18 @@ t0 = time.time()
 for c in casos:
     sesion = Sesion(usuario=ctx.usuario, usuario_id=ctx.usuario_id, rol=ctx.rol)
     llamadas = []
-    ag = Agente(OpenRouter(), ctx, sesion,
-                on_tool=lambda n, ar, r: llamadas.append({"tool": n, "args": ar}))
+    ag = crear_agente(ctx, sesion,
+                      on_tool=lambda n, ar, r: llamadas.append({"tool": n, "args": ar}))
     t = time.time()
     try:
         resp = ag.responder(c["pregunta"])
     except Exception as exc:
         resp = f"[EXCEPCION] {type(exc).__name__}: {exc}"
     dt = round(time.time() - t, 1)
-    out.append({**c, "respuesta": resp, "herramientas": llamadas, "segundos": dt})
+    res = getattr(ag, "ultimo_resultado", None)
+    modelos = sorted((res.model_usage or {}).keys()) if res else [settings.MODELO]
+    out.append({**c, "respuesta": resp, "herramientas": llamadas, "segundos": dt,
+                "modelos": modelos})
     print(f"[{c['n']:02d}] {dt:5.1f}s {len(llamadas)}t | {c['pregunta'][:52]}")
     print(f"     -> {resp[:150].replace(chr(10),' ')}")
     json.dump(out, open(os.path.join(SPD, a.salida), "w", encoding="utf8"),

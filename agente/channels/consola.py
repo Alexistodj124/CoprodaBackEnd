@@ -4,7 +4,7 @@ from __future__ import annotations
 import getpass
 import json
 
-from agent import Agente, OpenRouter, Sesion
+from agent import Sesion, crear_agente
 from backend.client import BackendError, CoprodaClient
 from settings import settings
 from tools.base import Contexto, REGISTRO
@@ -65,7 +65,7 @@ def ejecutar_repl() -> None:
         recorte = json.dumps(resultado, ensure_ascii=False, default=str)[:300]
         print(f"  · {nombre}({json.dumps(args, ensure_ascii=False)}) -> {recorte}")
 
-    agente = Agente(OpenRouter(), ctx, sesion, on_tool=traza)
+    agente = crear_agente(ctx, sesion, on_tool=traza)
 
     while True:
         try:

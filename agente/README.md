@@ -1,22 +1,25 @@
 # Agente conversacional Coproda — Ventas
 
 Asistente de **solo lectura** para vendedores. Habla en lenguaje natural,
-consulta la API de Coproda con *function calling* vía OpenRouter, y contesta
+consulta la API de Coproda con *function calling* vía el SDK oficial de Anthropic, y contesta
 con datos reales.
 
 **Alcance:** clientes, cartera y saldos, órdenes de venta, precios, y
 existencias de producto **terminado y agranel**.
 **Fuera de alcance:** producción, procesos, materia prima, recetas y mermas.
 
-Hoy corre en consola. El canal de WhatsApp es fase 2 y ya está previsto en
-`channels/whatsapp.py`.
+Corre en consola (`python main.py`) o como webhook de WhatsApp Cloud API
+(`python main.py whatsapp`), este último solo para pruebas locales con ngrok.
 
 ## Cómo correrlo
 
 ```bash
 cd agente
+python3.12 -m venv .venv  # el SDK de anthropic pide Python >= 3.10
+source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env      # pon tu OPENROUTER_API_KEY
+cp .env.example .env
+claude auth login         # una vez: inicia sesion con tu suscripcion de Claude
 python main.py
 ```
 
@@ -30,33 +33,48 @@ Comandos del REPL: `/ayuda`, `/tools`, `/debug`, `/nuevo`, `/salir`.
 `/debug` imprime cada llamada a herramienta con sus argumentos y su resultado:
 es lo más útil para afinar prompts y descripciones.
 
+## WhatsApp (pruebas locales)
+
+App de Meta "Coproda Pruebas" con el número de prueba +1 555 662 0457.
+Solo contesta a los números de `WA_NUMEROS_PERMITIDOS`, y todos usan el usuario
+de Coproda con el que se inicia sesión al arrancar.
+
+```bash
+ngrok http 8000                    # en otra terminal
+python main.py whatsapp            # pide usuario y contraseña de Coproda
+```
+
+- Las variables `WA_*` están documentadas en `.env.example`.
+- La Callback URL en Meta (WhatsApp > Configuración) es `<url de ngrok>/webhook`,
+  con el mismo `WA_VERIFY_TOKEN` del `.env` y el campo `messages` suscrito. Si
+  cambia la URL de ngrok, hay que actualizarla en Meta.
+- El token de "Generate token" en API Setup es temporal (unas horas). Cuando
+  vence, Graph API responde 401: se genera otro y se reemplaza `WA_TOKEN`.
+- Fuera de la ventana de 24 h desde el último mensaje del usuario, WhatsApp solo
+  acepta plantillas aprobadas.
+
 ## Modelo
 
-Por defecto `anthropic/claude-opus-5` vía OpenRouter.
+Por defecto `claude-opus-5` (`AGENTE_MODELO` en el `.env`). Dos backends,
+elegidos con `AGENTE_BACKEND`:
+
+- `suscripcion` (por defecto): Claude Agent SDK sobre tu sesión de Claude Code,
+  sin API key. Las 10 herramientas van como servidor MCP en proceso; se apagan
+  las herramientas integradas de Claude Code, tus settings, hooks, CLAUDE.md y
+  skills, para que el modelo solo vea este agente. Solo para pruebas locales.
+- `api`: Messages API con `ANTHROPIC_API_KEY` (`agent/llm.py` + `agent/runtime.py`).
 
 Lo único que decide si este agente sirve es la disciplina de tool-calling: elegir
 la herramienta correcta, encadenar `fecha_hoy` antes de un rango de fechas,
 preguntar cuando hay dos clientes que coinciden, y no inventar un saldo cuando la
 herramienta devolvió vacío. Ahí es donde se nota el modelo, no en la redacción.
 
-Costo real de este agente: el prefijo estable (system prompt + los 10 esquemas)
-son ~1,840 tokens, y una consulta típica son 2 llamadas al modelo (elegir
-herramienta, redactar respuesta), unas 3 si encadena. Eso da ~6,000 tokens de
-entrada y ~250 de salida por consulta.
+Opus 5 piensa por defecto y `max_tokens` cubre pensamiento + respuesta, por eso
+`AGENTE_MAX_TOKENS` va en 16000. `AGENTE_EFFORT` (low…max) es la palanca de
+costo/latencia; vacío usa el default del modelo. El system prompt y los esquemas
+se cachean, y si un clasificador de seguridad rechaza una consulta la API la
+reintenta sola en el modelo de respaldo (`fallbacks: "default"`).
 
-| Modelo | $/1M in-out | Por consulta | 1,500 consultas/mes |
-|---|---|---|---|
-| `anthropic/claude-opus-5` | $5 / $25 | ~Q0.28 | ~Q420 |
-| `anthropic/claude-sonnet-5` | $2 / $10 | ~Q0.11 | ~Q170 |
-| `anthropic/claude-haiku-4.5` | $1 / $5 | ~Q0.06 | ~Q85 |
-
-Precios de OpenRouter a jun-2026; sumale la comisión de OpenRouter al recargar
-saldo. Cambiar de modelo es una variable en el `.env`, así que se puede medir con
-tráfico real antes de decidir.
-
-**`temperature` no se manda.** Opus 5, Sonnet 5 y Fable 5 ya no lo aceptan.
-`OPENROUTER_TEMPERATURA` queda vacía por defecto y solo se llena si bajás a un
-modelo viejo (Sonnet 4.6, Haiku 4.5) que sí lo admite.
 
 ## Cómo está armado
 
@@ -71,13 +89,14 @@ agente/
 │   ├── ventas.py           clientes, órdenes, cartera, precios, resúmenes
 │   └── inventario.py       stock de terminado y agranel
 ├── agent/
-│   ├── llm.py              cliente OpenRouter
+│   ├── llm.py              cliente Anthropic (backend api)
+│   ├── suscripcion.py      agente sobre Claude Agent SDK (backend suscripcion)
 │   ├── prompts.py          system prompt
 │   ├── session.py          historial acotado por usuario
 │   └── runtime.py          loop LLM ⇄ herramientas
 └── channels/
     ├── consola.py          REPL (lo que se usa hoy)
-    └── whatsapp.py         webhook Cloud API (pendiente)
+    └── whatsapp.py         webhook Cloud API (pruebas locales)
 ```
 
 La idea de fondo: **el modelo nunca toca la base ni arma URLs**. Solo puede

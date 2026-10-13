@@ -1,9 +1,7 @@
-"""Cliente minimo de OpenRouter (API compatible con OpenAI chat/completions)."""
+"""Cliente del modelo via el SDK oficial de Anthropic (Messages API)."""
 from __future__ import annotations
 
-import json
-
-import requests
+import anthropic
 
 from settings import settings
 
@@ -12,48 +10,45 @@ class LLMError(RuntimeError):
     pass
 
 
-class OpenRouter:
+class Claude:
     def __init__(self, api_key: str | None = None, modelo: str | None = None):
-        self.api_key = api_key or settings.OPENROUTER_API_KEY
         self.modelo = modelo or settings.MODELO
-        self.base_url = settings.OPENROUTER_BASE_URL.rstrip("/")
-        if not self.api_key:
+        api_key = api_key or settings.ANTHROPIC_API_KEY
+        if not api_key:
             raise LLMError(
-                "Falta OPENROUTER_API_KEY. Copia .env.example a .env y ponla ahi."
+                "Falta ANTHROPIC_API_KEY. Copia .env.example a .env y ponla ahi."
             )
+        self.cliente = anthropic.Anthropic(
+            api_key=api_key, timeout=settings.TIMEOUT_LLM
+        )
 
-    def chat(self, mensajes: list[dict], herramientas: list[dict] | None = None) -> dict:
-        payload = {
+    def chat(self, sistema: str, mensajes: list[dict],
+             herramientas: list[dict] | None = None):
+        """Una vuelta del modelo. Devuelve el BetaMessage del SDK."""
+        params = {
             "model": self.modelo,
-            "messages": mensajes,
             "max_tokens": settings.MAX_TOKENS,
+            "system": sistema,
+            "messages": mensajes,
+            # System prompt + tools no cambian entre vueltas: se cachean.
+            "cache_control": {"type": "ephemeral"},
+            # Si un clasificador de seguridad rechaza la solicitud, la API la
+            # reintenta en el modelo recomendado en vez de devolver el rechazo.
+            "betas": ["server-side-fallback-2026-07-01"],
+            "fallbacks": "default",
         }
-        # temperature esta removido en Opus 5 / Sonnet 5 / Fable 5: solo se manda
-        # si esta configurada explicitamente.
-        if settings.TEMPERATURA is not None:
-            payload["temperature"] = settings.TEMPERATURA
+        if settings.EFFORT:
+            params["output_config"] = {"effort": settings.EFFORT}
         if herramientas:
-            payload["tools"] = herramientas
-            payload["tool_choice"] = "auto"
+            params["tools"] = herramientas
 
         try:
-            resp = requests.post(
-                f"{self.base_url}/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json",
-                    "X-Title": "Coproda Agente",
-                },
-                data=json.dumps(payload),
-                timeout=settings.TIMEOUT_LLM,
-            )
-        except requests.RequestException as exc:
-            raise LLMError(f"No se pudo contactar OpenRouter: {exc}") from exc
-
-        if resp.status_code >= 400:
-            raise LLMError(f"OpenRouter {resp.status_code}: {resp.text[:400]}")
-
-        datos = resp.json()
-        if "choices" not in datos:
-            raise LLMError(f"Respuesta inesperada de OpenRouter: {str(datos)[:400]}")
-        return datos
+            return self.cliente.beta.messages.create(**params)
+        except anthropic.AuthenticationError as exc:
+            raise LLMError("ANTHROPIC_API_KEY invalida.") from exc
+        except anthropic.RateLimitError as exc:
+            raise LLMError(f"Limite de uso de Anthropic: {exc.message}") from exc
+        except anthropic.APIStatusError as exc:
+            raise LLMError(f"Anthropic {exc.status_code}: {exc.message}") from exc
+        except anthropic.APIConnectionError as exc:
+            raise LLMError(f"No se pudo contactar Anthropic: {exc}") from exc

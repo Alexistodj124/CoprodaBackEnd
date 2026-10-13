@@ -1,4 +1,4 @@
-"""Punto de entrada. Uso: python main.py"""
+"""Punto de entrada. Uso: python main.py [whatsapp]"""
 from __future__ import annotations
 
 import os
@@ -13,7 +13,12 @@ try:
 except ImportError:
     pass
 
-from channels.consola import ejecutar_repl  # noqa: E402
-
 if __name__ == "__main__":
-    ejecutar_repl()
+    if sys.argv[1:] == ["whatsapp"]:
+        from channels.whatsapp import ejecutar_servidor
+
+        ejecutar_servidor()
+    else:
+        from channels.consola import ejecutar_repl
+
+        ejecutar_repl()

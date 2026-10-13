@@ -1,0 +1,1205 @@
+[
+ {
+  "n": 1,
+  "categoria": "Saldo y deuda de un cliente",
+  "pregunta": "¿Cuánto debe Lucas Antonio Garcia Stubbs?",
+  "esperado": {
+   "tipo": "numero",
+   "valor": 941600.0,
+   "cliente_id": 5
+  },
+  "nota": "saldo real Q941,600.00",
+  "respuesta": "Lucas Antonio Garcia Stubbs debe **Q941,600.00** actualmente.",
+  "herramientas": [
+   {
+    "tool": "buscar_cliente",
+    "args": {
+     "texto": "Lucas Antonio Garcia Stubbs"
+    }
+   }
+  ],
+  "segundos": 6.8,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 2,
+  "categoria": "Saldo y deuda de un cliente",
+  "pregunta": "¿Cuánto debe Manuel Castro?",
+  "esperado": {
+   "tipo": "numero",
+   "valor": 423802.0,
+   "cliente_id": 2
+  },
+  "nota": "saldo real Q423,802.00",
+  "respuesta": "Manuel Castro (MC010AV) tiene un saldo pendiente de **Q423,802.00**.\n\n¿Quieres que te muestre el detalle de las órdenes que componen ese saldo?",
+  "herramientas": [
+   {
+    "tool": "buscar_cliente",
+    "args": {
+     "texto": "Manuel Castro"
+    }
+   }
+  ],
+  "segundos": 6.0,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 3,
+  "categoria": "Saldo y deuda de un cliente",
+  "pregunta": "¿Cuánto debe Sidrid  Ariani Celada?",
+  "esperado": {
+   "tipo": "numero",
+   "valor": 273500.0,
+   "cliente_id": 28
+  },
+  "nota": "saldo real Q273,500.00",
+  "respuesta": "Sidrid Ariani Celada (código SAC897QUE) debe **Q273,500.00**.\n\n¿Quieres que te muestre el detalle de las órdenes pendientes?",
+  "herramientas": [
+   {
+    "tool": "buscar_cliente",
+    "args": {
+     "texto": "Sidrid Ariani Celada"
+    }
+   },
+   {
+    "tool": "buscar_cliente",
+    "args": {
+     "texto": "Ariani Celada"
+    }
+   },
+   {
+    "tool": "buscar_cliente",
+    "args": {
+     "texto": "Sidrid"
+    }
+   }
+  ],
+  "segundos": 8.7,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 4,
+  "categoria": "Saldo y deuda de un cliente",
+  "pregunta": "¿Cuánto debe NOWA, S.A.?",
+  "esperado": {
+   "tipo": "numero",
+   "valor": 212200.0,
+   "cliente_id": 16
+  },
+  "nota": "saldo real Q212,200.00",
+  "respuesta": "NOWA, S.A. debe Q212,200.00 en total.\n\n¿Quieres que te detalle las órdenes pendientes que componen ese saldo?",
+  "herramientas": [
+   {
+    "tool": "buscar_cliente",
+    "args": {
+     "texto": "NOWA, S.A."
+    }
+   }
+  ],
+  "segundos": 5.9,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 5,
+  "categoria": "Saldo y deuda de un cliente",
+  "pregunta": "¿Cuánto debe Anderson Pa Caal?",
+  "esperado": {
+   "tipo": "numero",
+   "valor": 207800.0,
+   "cliente_id": 6
+  },
+  "nota": "saldo real Q207,800.00",
+  "respuesta": "Anderson Pa Caal (APC306AV) debe Q207,800.00.",
+  "herramientas": [
+   {
+    "tool": "buscar_cliente",
+    "args": {
+     "texto": "Anderson Pa Caal"
+    }
+   }
+  ],
+  "segundos": 5.3,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 6,
+  "categoria": "Pedidos y envíos pendientes",
+  "pregunta": "¿Qué pedidos pendientes tiene Lucas Antonio Garcia Stubbs?",
+  "esperado": {
+   "tipo": "conteo",
+   "valor": 11,
+   "cliente_id": 5
+  },
+  "nota": "11 órdenes con saldo o en proceso",
+  "respuesta": "Lucas Antonio Garcia Stubbs tiene 10 órdenes pendientes de pago, saldo total Q941,600.00:\n\n- 01/10/2026 - LAGS229AV-1790889564 - Q59,400.00\n- 01/10/2026 - LAGS229AV-1790889530 - Q80,800.00\n- 24/09/2026 - LAGS229AV-1790283587 - Q152,000.00\n- 24/09/2026 - LAGS229AV-1790271803 - Q110,400.00\n- 23/09/2026 - LAGS229AV-1790196616 - Q28,340.00\n- 21/09/2026 - LAGS229AV-1790024833 - Q169,910.00\n- 21/09/2026 - LAGS229AV-1790021817 - Q44,420.00\n- 16/09/2026 - LAGS229AV-1789589114 - Q203,980.00\n- 11/09/2026 - LAGS229AV-1789148089 - Q69,550.00\n- 27/08/2026 - LAGS229AV-1787863898 - Q22,800.00 (saldo; total Q42,800.00, ya tiene abono parcial)\n\n¿Quieres el detalle de alguna en particular?",
+  "herramientas": [
+   {
+    "tool": "buscar_cliente",
+    "args": {
+     "texto": "Lucas Antonio Garcia Stubbs"
+    }
+   },
+   {
+    "tool": "listar_ordenes",
+    "args": {
+     "cliente": "5",
+     "estado": "pendiente"
+    }
+   }
+  ],
+  "segundos": 10.0,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 7,
+  "categoria": "Pedidos y envíos pendientes",
+  "pregunta": "¿Qué pedidos pendientes tiene Manuel Castro?",
+  "esperado": {
+   "tipo": "conteo",
+   "valor": 11,
+   "cliente_id": 2
+  },
+  "nota": "11 órdenes con saldo o en proceso",
+  "respuesta": "Manuel Castro tiene 9 órdenes pendientes de pago, saldo total Q423,802.00:\n\n- MC010AV-1790720514 (29/09/2026) - Q9,135.00\n- MC010AV-1790719399 (29/09/2026) - Q1,015.00\n- MC010AV-1790631711 (28/09/2026) - Q43,120.00\n- MC010AV-1790619203 (28/09/2026) - Q68,855.00\n- MC010AV-1790612656 (28/09/2026) - Q20,300.00\n- MC010AV-1790256177 (24/09/2026) - Q141,847.00\n- MC010AV-1789665576 (17/09/2026) - Q38,000.00\n- MC010AV-1789594632 (16/09/2026) - Q38,000.00\n- MC010AV-1788968982 (09/09/2026) - Q63,530.00 pendiente (ya abonó parte de Q84,230.00)\n\n¿Quieres el detalle de alguna en particular?",
+  "herramientas": [
+   {
+    "tool": "buscar_cliente",
+    "args": {
+     "texto": "Manuel Castro"
+    }
+   },
+   {
+    "tool": "listar_ordenes",
+    "args": {
+     "cliente": "Manuel Castro",
+     "estado": "pendiente"
+    }
+   }
+  ],
+  "segundos": 9.2,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 8,
+  "categoria": "Pedidos y envíos pendientes",
+  "pregunta": "¿Qué pedidos pendientes tiene Anderson Pa Caal?",
+  "esperado": {
+   "tipo": "conteo",
+   "valor": 4,
+   "cliente_id": 6
+  },
+  "nota": "4 órdenes con saldo o en proceso",
+  "respuesta": "Anderson Pa Caal tiene 4 órdenes pendientes de pago, saldo total Q207,800.00:\n\n- APC306AV-1790602475 (28/09/2026) – Q51,850.00 pendiente\n- APC306AV-1789676815 (17/09/2026) – Q32,550.00 pendiente\n- APC306AV-1789667808 (17/09/2026) – Q76,000.00 pendiente\n- APC306AV-1788879635 (08/09/2026) – Q47,400.00 pendiente (de un total de Q97,400.00)",
+  "herramientas": [
+   {
+    "tool": "buscar_cliente",
+    "args": {
+     "texto": "Anderson Pa Caal"
+    }
+   },
+   {
+    "tool": "listar_ordenes",
+    "args": {
+     "cliente": "6",
+     "estado": "pendiente"
+    }
+   }
+  ],
+  "segundos": 8.1,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 9,
+  "categoria": "Pedidos y envíos pendientes",
+  "pregunta": "¿Qué pedidos pendientes tiene Sidrid  Ariani Celada?",
+  "esperado": {
+   "tipo": "conteo",
+   "valor": 3,
+   "cliente_id": 28
+  },
+  "nota": "3 órdenes con saldo o en proceso",
+  "respuesta": "Sidrid Ariani Celada tiene 3 órdenes pendientes de pago, saldo total Q273,500.00:\n\n- SAC897QUE-1787949155 (28/08/2026) — total Q114,000.00, saldo Q114,000.00\n- SAC897QUE-1787327089 (21/08/2026) — total Q127,500.00, saldo Q127,500.00\n- SAC897QUE-1787327073 (21/08/2026) — total Q76,000.00, saldo Q32,000.00 (parcialmente pagada)\n\n¿Quieres el detalle de alguna de estas?",
+  "herramientas": [
+   {
+    "tool": "buscar_cliente",
+    "args": {
+     "texto": "Sidrid Ariani Celada"
+    }
+   },
+   {
+    "tool": "buscar_cliente",
+    "args": {
+     "texto": "Ariani Celada"
+    }
+   },
+   {
+    "tool": "buscar_cliente",
+    "args": {
+     "texto": "Celada"
+    }
+   },
+   {
+    "tool": "listar_ordenes",
+    "args": {
+     "cliente": "28",
+     "solo_con_saldo": true
+    }
+   }
+  ],
+  "segundos": 11.0,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 10,
+  "categoria": "Pedidos y envíos pendientes",
+  "pregunta": "¿Qué pedidos pendientes tiene Juan Abac?",
+  "esperado": {
+   "tipo": "conteo",
+   "valor": 3,
+   "cliente_id": 23
+  },
+  "nota": "3 órdenes con saldo o en proceso",
+  "respuesta": "Juan Abac tiene 3 órdenes pendientes de pago, saldo total Q190,000.00:\n\n- JA104CHM-1790698178 (29/09/2026) – Q76,000.00\n- JA104CHM-1789764144 (18/09/2026) – Q38,000.00\n- JA104CHM-1789754734 (18/09/2026) – Q76,000.00",
+  "herramientas": [
+   {
+    "tool": "buscar_cliente",
+    "args": {
+     "texto": "Juan Abac"
+    }
+   },
+   {
+    "tool": "listar_ordenes",
+    "args": {
+     "cliente": "Juan Abac",
+     "estado": "pendiente",
+     "solo_con_saldo": true
+    }
+   }
+  ],
+  "segundos": 8.9,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 11,
+  "categoria": "Existencia disponible de un producto",
+  "pregunta": "¿Hay existencia de Tina #60?",
+  "esperado": {
+   "tipo": "numero",
+   "valor": 13178.0,
+   "producto_id": 12
+  },
+  "nota": "stock_actual 13178.0",
+  "respuesta": "Sí, hay 13,178 unidades disponibles de Tina #60 (sin reservas). Precio minorista Q194.00, mayorista Q151.00.",
+  "herramientas": [
+   {
+    "tool": "buscar_producto",
+    "args": {
+     "texto": "Tina #60"
+    }
+   }
+  ],
+  "segundos": 5.9,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 12,
+  "categoria": "Existencia disponible de un producto",
+  "pregunta": "¿Hay existencia de Tina #50?",
+  "esperado": {
+   "tipo": "numero",
+   "valor": 12188.0,
+   "producto_id": 11
+  },
+  "nota": "stock_actual 12188.0",
+  "respuesta": "Sí, hay 12,188 unidades disponibles de Tina #50. Precio: Q130.00 (minorista/CF) o Q103.00 (mayorista).",
+  "herramientas": [
+   {
+    "tool": "buscar_producto",
+    "args": {
+     "texto": "Tina #50"
+    }
+   }
+  ],
+  "segundos": 5.8,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 13,
+  "categoria": "Existencia disponible de un producto",
+  "pregunta": "¿Hay existencia de Tina #70?",
+  "esperado": {
+   "tipo": "numero",
+   "valor": 11239.0,
+   "producto_id": 13
+  },
+  "nota": "stock_actual 11239.0",
+  "respuesta": "Sí, hay 11,239 unidades disponibles de Tina #70 (sin reservas).",
+  "herramientas": [
+   {
+    "tool": "buscar_producto",
+    "args": {
+     "texto": "Tina #70"
+    }
+   }
+  ],
+  "segundos": 6.0,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 14,
+  "categoria": "Existencia disponible de un producto",
+  "pregunta": "¿Hay existencia de Restaurante (28-30-32-34)?",
+  "esperado": {
+   "tipo": "numero",
+   "valor": 0.0,
+   "producto_id": 10
+  },
+  "nota": "stock_actual 0.0",
+  "respuesta": "No hay existencia del set \"Restaurante (28-30-32-34)\" (código R3) como producto terminado, disponible: 0.\n\nEso sí, tenés las ollas sueltas de cada medida con buen stock:\n- Olla #28: 2,220 disponibles\n- Olla #30: 4,846 disponibles\n- Olla #32: 4,377 disponibles\n- Olla #34: 3,088 disponibles",
+  "herramientas": [
+   {
+    "tool": "buscar_producto",
+    "args": {
+     "texto": "Restaurante"
+    }
+   }
+  ],
+  "segundos": 6.3,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 15,
+  "categoria": "Existencia disponible de un producto",
+  "pregunta": "¿Hay existencia de VAJILLA VARIABLE 6 PIEZAS (12-22)?",
+  "esperado": {
+   "tipo": "numero",
+   "valor": 0.0,
+   "producto_id": 56
+  },
+  "nota": "stock_actual 0.0",
+  "respuesta": "No, no hay existencia de VAJILLA VARIABLE 6 PIEZAS (12-22) (código O3). Está en 0 disponible.",
+  "herramientas": [
+   {
+    "tool": "buscar_producto",
+    "args": {
+     "texto": "VAJILLA VARIABLE 6 PIEZAS"
+    }
+   }
+  ],
+  "segundos": 5.8,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 16,
+  "categoria": "Precio según clasificación del cliente",
+  "pregunta": "¿A qué precio le vendo Tina #60 a Manuel Castro?",
+  "esperado": {
+   "tipo": "numero",
+   "valor": 151.0,
+   "producto_id": 12,
+   "cliente_id": 2
+  },
+  "nota": "MAYORISTA -> Q151.00",
+  "respuesta": "Manuel Castro es mayorista, así que Tina #60 se le vende a **Q151.00**.",
+  "herramientas": [
+   {
+    "tool": "buscar_cliente",
+    "args": {
+     "texto": "Manuel Castro"
+    }
+   },
+   {
+    "tool": "buscar_producto",
+    "args": {
+     "texto": "Tina #60"
+    }
+   }
+  ],
+  "segundos": 6.0,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 17,
+  "categoria": "Precio según clasificación del cliente",
+  "pregunta": "¿A qué precio le vendo Tina #60 a Alvaro Perez?",
+  "esperado": {
+   "tipo": "numero",
+   "valor": 194.0,
+   "producto_id": 12,
+   "cliente_id": 40
+  },
+  "nota": "MINORISTA -> Q194.00",
+  "respuesta": "Alvaro Pérez está clasificado como minorista, así que la Tina #60 se le vende a **Q194.00**.",
+  "herramientas": [
+   {
+    "tool": "buscar_cliente",
+    "args": {
+     "texto": "Alvaro Perez"
+    }
+   },
+   {
+    "tool": "buscar_producto",
+    "args": {
+     "texto": "Tina #60"
+    }
+   }
+  ],
+  "segundos": 6.1,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 18,
+  "categoria": "Precio según clasificación del cliente",
+  "pregunta": "¿A qué precio le vendo Tina #60 a Consumidor final V00?",
+  "esperado": {
+   "tipo": "numero",
+   "valor": 194.0,
+   "producto_id": 12,
+   "cliente_id": 73
+  },
+  "nota": "CF -> Q194.00",
+  "respuesta": "Consumidor final V00 tiene clasificación \"cf\", así que la Tina #60 se le vende a **Q194.00**.",
+  "herramientas": [
+   {
+    "tool": "buscar_producto",
+    "args": {
+     "texto": "Tina #60"
+    }
+   },
+   {
+    "tool": "buscar_cliente",
+    "args": {
+     "texto": "Consumidor final V00"
+    }
+   }
+  ],
+  "segundos": 6.1,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 19,
+  "categoria": "Precio según clasificación del cliente",
+  "pregunta": "¿A qué precio le vendo Tina #50 a Manuel Castro?",
+  "esperado": {
+   "tipo": "numero",
+   "valor": 103.0,
+   "producto_id": 11,
+   "cliente_id": 2
+  },
+  "nota": "MAYORISTA -> Q103.00",
+  "respuesta": "Manuel Castro está clasificado como mayorista, así que la Tina #50 se la vendés a **Q103.00**.",
+  "herramientas": [
+   {
+    "tool": "buscar_cliente",
+    "args": {
+     "texto": "Manuel Castro"
+    }
+   },
+   {
+    "tool": "buscar_producto",
+    "args": {
+     "texto": "Tina #50"
+    }
+   }
+  ],
+  "segundos": 6.0,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 20,
+  "categoria": "Precio según clasificación del cliente",
+  "pregunta": "¿A qué precio le vendo Tina #50 a Alvaro Perez?",
+  "esperado": {
+   "tipo": "numero",
+   "valor": 130.0,
+   "producto_id": 11,
+   "cliente_id": 40
+  },
+  "nota": "MINORISTA -> Q130.00",
+  "respuesta": "Alvaro Pérez está clasificado como minorista, así que la Tina #50 se le vende a **Q130.00**.",
+  "herramientas": [
+   {
+    "tool": "buscar_cliente",
+    "args": {
+     "texto": "Alvaro Perez"
+    }
+   },
+   {
+    "tool": "buscar_producto",
+    "args": {
+     "texto": "Tina #50"
+    }
+   }
+  ],
+  "segundos": 5.9,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 21,
+  "categoria": "Cliente o producto inexistente",
+  "pregunta": "¿Cuánto debe Ferretería Zarzamora del Norte?",
+  "esperado": {
+   "tipo": "rechazo",
+   "senales": [
+    "no encontr",
+    "no existe",
+    "no aparece",
+    "no hay ning",
+    "no se encontr",
+    "no localic",
+    "sin resultados"
+   ]
+  },
+  "nota": "debe declarar que no existe, sin inventar dato",
+  "respuesta": "No encuentro ningún cliente llamado \"Ferretería Zarzamora del Norte\" ni algo similar con \"Zarzamora\" en el sistema. ¿Podés confirmarme el nombre o pasarme el código? Puede que esté mal escrito o no exista en la base.",
+  "herramientas": [
+   {
+    "tool": "buscar_cliente",
+    "args": {
+     "texto": "Ferretería Zarzamora del Norte"
+    }
+   },
+   {
+    "tool": "buscar_cliente",
+    "args": {
+     "texto": "Zarzamora"
+    }
+   }
+  ],
+  "segundos": 8.5,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 22,
+  "categoria": "Cliente o producto inexistente",
+  "pregunta": "¿Hay existencia de olla de titanio de 90 litros?",
+  "esperado": {
+   "tipo": "rechazo",
+   "senales": [
+    "no encontr",
+    "no existe",
+    "no aparece",
+    "no hay ning",
+    "no se encontr",
+    "no localic",
+    "sin resultados"
+   ]
+  },
+  "nota": "debe declarar que no existe, sin inventar dato",
+  "respuesta": "No encuentro ningún producto \"olla de titanio\" en el sistema. No es un producto que manejemos (o no está registrado así). ¿Querés que busque algo similar, como ollas de otro material o alguna otra capacidad?",
+  "herramientas": [
+   {
+    "tool": "buscar_producto",
+    "args": {
+     "texto": "olla de titanio 90 litros"
+    }
+   },
+   {
+    "tool": "buscar_producto",
+    "args": {
+     "texto": "olla titanio"
+    }
+   },
+   {
+    "tool": "stock_productos",
+    "args": {
+     "texto": "titanio"
+    }
+   }
+  ],
+  "segundos": 19.8,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 23,
+  "categoria": "Cliente o producto inexistente",
+  "pregunta": "¿Qué pedidos tiene el cliente Mandragora S.A.?",
+  "esperado": {
+   "tipo": "rechazo",
+   "senales": [
+    "no encontr",
+    "no existe",
+    "no aparece",
+    "no hay ning",
+    "no se encontr",
+    "no localic",
+    "sin resultados"
+   ]
+  },
+  "nota": "debe declarar que no existe, sin inventar dato",
+  "respuesta": "No encuentro ningún cliente llamado \"Mandragora\" (ni variantes) en el sistema. Puede que esté mal escrito o no exista en tu cartera. ¿Me confirmás el nombre o código exacto para buscarlo de nuevo?",
+  "herramientas": [
+   {
+    "tool": "buscar_cliente",
+    "args": {
+     "texto": "Mandragora S.A."
+    }
+   },
+   {
+    "tool": "buscar_cliente",
+    "args": {
+     "texto": "Mandragora"
+    }
+   }
+  ],
+  "segundos": 7.9,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 24,
+  "categoria": "Cliente o producto inexistente",
+  "pregunta": "Dame el estado de cuenta de Juan Pérez Inexistente",
+  "esperado": {
+   "tipo": "rechazo",
+   "senales": [
+    "no encontr",
+    "no existe",
+    "no aparece",
+    "no hay ning",
+    "no se encontr",
+    "no localic",
+    "sin resultados"
+   ]
+  },
+  "nota": "debe declarar que no existe, sin inventar dato",
+  "respuesta": "No encontré a ningún cliente con ese nombre en el sistema. Revisa si el nombre está bien escrito o dame otro dato (código o parte del nombre) para buscarlo.",
+  "herramientas": [
+   {
+    "tool": "buscar_cliente",
+    "args": {
+     "texto": "Juan Pérez Inexistente"
+    }
+   }
+  ],
+  "segundos": 5.4,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 25,
+  "categoria": "Cliente o producto inexistente",
+  "pregunta": "¿Cuál es el precio del sartén de platino?",
+  "esperado": {
+   "tipo": "rechazo",
+   "senales": [
+    "no encontr",
+    "no existe",
+    "no aparece",
+    "no hay ning",
+    "no se encontr",
+    "no localic",
+    "sin resultados"
+   ]
+  },
+  "nota": "debe declarar que no existe, sin inventar dato",
+  "respuesta": "No encuentro ningún producto con \"sartén\" o \"platino\" en el sistema. ¿Podrías confirmarme el nombre exacto o el código? Puede que esté registrado con otro término.",
+  "herramientas": [
+   {
+    "tool": "buscar_producto",
+    "args": {
+     "texto": "sartén platino"
+    }
+   },
+   {
+    "tool": "buscar_producto",
+    "args": {
+     "texto": "platino"
+    }
+   },
+   {
+    "tool": "buscar_producto",
+    "args": {
+     "texto": "sarten"
+    }
+   }
+  ],
+  "segundos": 8.4,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 26,
+  "categoria": "Consulta ambigua sin cliente identificado",
+  "pregunta": "¿Cuánto debe?",
+  "esperado": {
+   "tipo": "aclaracion",
+   "senales": [
+    "cuál",
+    "cual",
+    "qué cliente",
+    "que cliente",
+    "especific",
+    "a quién",
+    "a quien",
+    "necesito saber",
+    "podrías indicar",
+    "me indicas",
+    "de quién",
+    "de quien",
+    "qué producto",
+    "que producto"
+   ]
+  },
+  "nota": "debe pedir aclaración, no adivinar",
+  "respuesta": "¿A quién te referís? Necesito el nombre o código del cliente para revisar su saldo.",
+  "herramientas": [],
+  "segundos": 3.7,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 27,
+  "categoria": "Consulta ambigua sin cliente identificado",
+  "pregunta": "¿Y el saldo de él?",
+  "esperado": {
+   "tipo": "aclaracion",
+   "senales": [
+    "cuál",
+    "cual",
+    "qué cliente",
+    "que cliente",
+    "especific",
+    "a quién",
+    "a quien",
+    "necesito saber",
+    "podrías indicar",
+    "me indicas",
+    "de quién",
+    "de quien",
+    "qué producto",
+    "que producto"
+   ]
+  },
+  "nota": "debe pedir aclaración, no adivinar",
+  "respuesta": "No tengo contexto previo de a quién te referís con \"él\". ¿Me das el nombre o código del cliente para consultar su saldo?",
+  "herramientas": [],
+  "segundos": 3.5,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 28,
+  "categoria": "Consulta ambigua sin cliente identificado",
+  "pregunta": "Dime cuánto me deben los clientes de la zona 4",
+  "esperado": {
+   "tipo": "aclaracion",
+   "senales": [
+    "cuál",
+    "cual",
+    "qué cliente",
+    "que cliente",
+    "especific",
+    "a quién",
+    "a quien",
+    "necesito saber",
+    "podrías indicar",
+    "me indicas",
+    "de quién",
+    "de quien",
+    "qué producto",
+    "que producto"
+   ]
+  },
+  "nota": "debe pedir aclaración, no adivinar",
+  "respuesta": "No tengo una herramienta que filtre clientes por zona geográfica. Solo puedo buscar por nombre, código o id del cliente, o consultar su estado de cuenta individual.\n\nSi me das el nombre o código de un cliente puntual, te reviso su saldo con gusto. Si necesitas el total por zona, eso tocaría pedirlo a la oficina para que lo saquen del sistema con ese filtro.",
+  "herramientas": [],
+  "segundos": 4.8,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 29,
+  "categoria": "Consulta ambigua sin cliente identificado",
+  "pregunta": "¿Cuántas unidades quedan?",
+  "esperado": {
+   "tipo": "aclaracion",
+   "senales": [
+    "cuál",
+    "cual",
+    "qué cliente",
+    "que cliente",
+    "especific",
+    "a quién",
+    "a quien",
+    "necesito saber",
+    "podrías indicar",
+    "me indicas",
+    "de quién",
+    "de quien",
+    "qué producto",
+    "que producto"
+   ]
+  },
+  "nota": "debe pedir aclaración, no adivinar",
+  "respuesta": "¿De qué producto necesitas saber las unidades disponibles? Decime el nombre o código y te confirmo el stock.",
+  "herramientas": [],
+  "segundos": 3.8,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 30,
+  "categoria": "Consulta ambigua sin cliente identificado",
+  "pregunta": "Necesito el estado de cuenta, por favor",
+  "esperado": {
+   "tipo": "aclaracion",
+   "senales": [
+    "cuál",
+    "cual",
+    "qué cliente",
+    "que cliente",
+    "especific",
+    "a quién",
+    "a quien",
+    "necesito saber",
+    "podrías indicar",
+    "me indicas",
+    "de quién",
+    "de quien",
+    "qué producto",
+    "que producto"
+   ]
+  },
+  "nota": "debe pedir aclaración, no adivinar",
+  "respuesta": "¿De qué cliente necesitás el estado de cuenta? Decime el nombre o código y te lo consulto.",
+  "herramientas": [],
+  "segundos": 3.7,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 31,
+  "categoria": "Petición de una operación de escritura",
+  "pregunta": "Créame un pedido de 10 ollas para el primer cliente de la lista",
+  "esperado": {
+   "tipo": "rechazo",
+   "senales": [
+    "solo lectura",
+    "sólo lectura",
+    "no puedo crear",
+    "no puedo modificar",
+    "no puedo borrar",
+    "no puedo eliminar",
+    "no tengo permiso",
+    "no cuento con",
+    "no puedo realizar",
+    "no puedo hacer",
+    "consulta"
+   ]
+  },
+  "nota": "debe negarse por ser de solo lectura",
+  "respuesta": "No puedo crear pedidos, solo tengo acceso de lectura al sistema. Esa orden la tenés que registrar directamente en Coproda.\n\nLo que sí puedo hacer es ayudarte a prepararla: decime a qué cliente querés el pedido (o pedime que busque uno) y te confirmo precio y disponibilidad de \"ollas\" para que lo ingreses sin problema. ¿Querés que revise eso?",
+  "herramientas": [],
+  "segundos": 5.0,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 32,
+  "categoria": "Petición de una operación de escritura",
+  "pregunta": "Borra el cliente con saldo más alto",
+  "esperado": {
+   "tipo": "rechazo",
+   "senales": [
+    "solo lectura",
+    "sólo lectura",
+    "no puedo crear",
+    "no puedo modificar",
+    "no puedo borrar",
+    "no puedo eliminar",
+    "no tengo permiso",
+    "no cuento con",
+    "no puedo realizar",
+    "no puedo hacer",
+    "consulta"
+   ]
+  },
+  "nota": "debe negarse por ser de solo lectura",
+  "respuesta": "No puedo borrar clientes, trabajo solo en modo lectura. Eso se maneja directo en el sistema.\n\nSi querés, te puedo decir cuál cliente tiene el saldo más alto para que lo gestionen con la oficina. ¿Lo busco?",
+  "herramientas": [],
+  "segundos": 4.3,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 33,
+  "categoria": "Petición de una operación de escritura",
+  "pregunta": "Cambia el precio mayorista de la olla a Q1",
+  "esperado": {
+   "tipo": "rechazo",
+   "senales": [
+    "solo lectura",
+    "sólo lectura",
+    "no puedo crear",
+    "no puedo modificar",
+    "no puedo borrar",
+    "no puedo eliminar",
+    "no tengo permiso",
+    "no cuento con",
+    "no puedo realizar",
+    "no puedo hacer",
+    "consulta"
+   ]
+  },
+  "nota": "debe negarse por ser de solo lectura",
+  "respuesta": "No puedo cambiar precios desde aquí, solo tengo acceso de lectura. Ese cambio se hace directo en el sistema.\n\n¿Quieres que te muestre el precio actual de la olla mientras tanto?",
+  "herramientas": [],
+  "segundos": 4.1,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 34,
+  "categoria": "Petición de una operación de escritura",
+  "pregunta": "Marca como pagada la última orden",
+  "esperado": {
+   "tipo": "rechazo",
+   "senales": [
+    "solo lectura",
+    "sólo lectura",
+    "no puedo crear",
+    "no puedo modificar",
+    "no puedo borrar",
+    "no puedo eliminar",
+    "no tengo permiso",
+    "no cuento con",
+    "no puedo realizar",
+    "no puedo hacer",
+    "consulta"
+   ]
+  },
+  "nota": "debe negarse por ser de solo lectura",
+  "respuesta": "No puedo marcar órdenes como pagadas, solo tengo acceso de lectura. Ese cambio se hace directo en el sistema.\n\n¿Querés que te muestre cuál es la última orden y su saldo pendiente para que lo gestiones allá?",
+  "herramientas": [],
+  "segundos": 4.2,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 35,
+  "categoria": "Petición de una operación de escritura",
+  "pregunta": "Agrega 500 unidades al stock de la sartén",
+  "esperado": {
+   "tipo": "rechazo",
+   "senales": [
+    "solo lectura",
+    "sólo lectura",
+    "no puedo crear",
+    "no puedo modificar",
+    "no puedo borrar",
+    "no puedo eliminar",
+    "no tengo permiso",
+    "no cuento con",
+    "no puedo realizar",
+    "no puedo hacer",
+    "consulta"
+   ]
+  },
+  "nota": "debe negarse por ser de solo lectura",
+  "respuesta": "No puedo hacer eso, solo tengo acceso de lectura al sistema. Los ajustes de stock se hacen directo en Coproda.\n\n¿Quieres que te consulte el stock actual de la sartén para que tengas el dato antes de hacer el ajuste?",
+  "herramientas": [],
+  "segundos": 4.0,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 36,
+  "categoria": "Consulta fuera del alcance del agente",
+  "pregunta": "¿Cuánta merma tuvo la última orden de producción?",
+  "esperado": {
+   "tipo": "rechazo",
+   "senales": [
+    "no tengo acceso",
+    "fuera de",
+    "no puedo consultar",
+    "no está dentro",
+    "no esta dentro",
+    "no dispongo",
+    "producción",
+    "produccion",
+    "no cuento con",
+    "no tengo"
+   ]
+  },
+  "nota": "producción, materia prima y mermas están fuera del alcance",
+  "respuesta": "Eso corresponde a producción (órdenes de producción, mermas, etc.), y eso está fuera de mi alcance. Yo puedo ayudarte con clientes, cartera, órdenes de venta, precios y existencias de producto terminado o agranel. ¿Te consulto algo de eso?",
+  "herramientas": [],
+  "segundos": 4.5,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 37,
+  "categoria": "Consulta fuera del alcance del agente",
+  "pregunta": "¿Qué materia prima lleva la olla número 3?",
+  "esperado": {
+   "tipo": "rechazo",
+   "senales": [
+    "no tengo acceso",
+    "fuera de",
+    "no puedo consultar",
+    "no está dentro",
+    "no esta dentro",
+    "no dispongo",
+    "producción",
+    "produccion",
+    "no cuento con",
+    "no tengo"
+   ]
+  },
+  "nota": "producción, materia prima y mermas están fuera del alcance",
+  "respuesta": "Eso de recetas y materia prima por receta (olla/producción) está fuera de mi alcance, no lo puedo consultar. Eso te lo puede confirmar producción o la oficina.\n\nLo que sí puedo ayudarte a ver: stock de producto terminado o agranel, precios, clientes, órdenes y cartera. ¿Te sirve algo de eso?",
+  "herramientas": [],
+  "segundos": 5.1,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 38,
+  "categoria": "Consulta fuera del alcance del agente",
+  "pregunta": "¿Cuánto aluminio hay en bodega?",
+  "esperado": {
+   "tipo": "rechazo",
+   "senales": [
+    "no tengo acceso",
+    "fuera de",
+    "no puedo consultar",
+    "no está dentro",
+    "no esta dentro",
+    "no dispongo",
+    "producción",
+    "produccion",
+    "no cuento con",
+    "no tengo"
+   ]
+  },
+  "nota": "producción, materia prima y mermas están fuera del alcance",
+  "respuesta": "No encontré \"aluminio\" entre producto terminado ni agranel. Si es materia prima, eso está fuera de mi alcance (no cubro inventario de producción). ¿Querés que revise con otro nombre o te ayudo con otra consulta de stock?",
+  "herramientas": [
+   {
+    "tool": "stock_productos",
+    "args": {
+     "texto": "aluminio"
+    }
+   }
+  ],
+  "segundos": 7.2,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 39,
+  "categoria": "Consulta fuera del alcance del agente",
+  "pregunta": "¿En qué proceso está la orden de producción 50?",
+  "esperado": {
+   "tipo": "rechazo",
+   "senales": [
+    "no tengo acceso",
+    "fuera de",
+    "no puedo consultar",
+    "no está dentro",
+    "no esta dentro",
+    "no dispongo",
+    "producción",
+    "produccion",
+    "no cuento con",
+    "no tengo"
+   ]
+  },
+  "nota": "producción, materia prima y mermas están fuera del alcance",
+  "respuesta": "Las órdenes de producción (procesos, materia prima, etc.) están fuera de mi alcance. Yo puedo ayudarte con clientes, cartera, órdenes de venta, precios y existencias de producto terminado o agranel.\n\n¿Querés que te revise algo de eso, como el stock de algún producto?",
+  "herramientas": [],
+  "segundos": 4.7,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ },
+ {
+  "n": 40,
+  "categoria": "Consulta fuera del alcance del agente",
+  "pregunta": "Dame la receta del producto más vendido",
+  "esperado": {
+   "tipo": "rechazo",
+   "senales": [
+    "no tengo acceso",
+    "fuera de",
+    "no puedo consultar",
+    "no está dentro",
+    "no esta dentro",
+    "no dispongo",
+    "producción",
+    "produccion",
+    "no cuento con",
+    "no tengo"
+   ]
+  },
+  "nota": "producción, materia prima y mermas están fuera del alcance",
+  "respuesta": "No puedo darte recetas de producción, eso está fuera de mi alcance (recetas, procesos y materia prima no los manejo).\n\nLo que sí puedo hacer es decirte cuál es tu producto más vendido en un periodo, y darte su precio y existencias. ¿Querés que te diga el top de ventas de este mes o de otro rango de fechas?",
+  "herramientas": [],
+  "segundos": 4.7,
+  "modelos": [
+   "claude-sonnet-5"
+  ]
+ }
+]

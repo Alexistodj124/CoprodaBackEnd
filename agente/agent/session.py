@@ -13,30 +13,37 @@ class Sesion:
     usuario_id: int | None
     rol: str
     mensajes: list[dict] = field(default_factory=list)
+    sistema: str = ""
+    sdk_session_id: str | None = None  # backend "suscripcion": la CLI guarda el historial
 
     def __post_init__(self):
-        if not self.mensajes:
-            self.mensajes = [{"role": "system", "content": sistema(self.usuario, self.rol)}]
+        # En la API de Anthropic el system prompt va aparte, no en `mensajes`.
+        self.sistema = sistema(self.usuario, self.rol)
 
     def agregar(self, mensaje: dict) -> None:
         self.mensajes.append(mensaje)
         self._recortar()
 
-    def _recortar(self) -> None:
-        """Conserva el system prompt y los ultimos N mensajes.
+    @staticmethod
+    def _es_turno_usuario(mensaje: dict) -> bool:
+        """Un 'user' con texto plano; los tool_result tambien son role 'user'."""
+        return mensaje.get("role") == "user" and isinstance(mensaje.get("content"), str)
 
-        Corta solo en un mensaje 'user' para no dejar tool_calls huerfanos,
-        que hacen fallar la API.
+    def _recortar(self) -> None:
+        """Conserva los ultimos N mensajes.
+
+        Corta solo en un turno de usuario con texto para no dejar tool_use /
+        tool_result huerfanos, que hacen fallar la API.
         """
         limite = settings.MAX_MENSAJES_HISTORIAL
-        cuerpo = self.mensajes[1:]
-        if len(cuerpo) <= limite:
+        if len(self.mensajes) <= limite:
             return
-        exceso = len(cuerpo) - limite
-        corte = exceso
-        while corte < len(cuerpo) and cuerpo[corte].get("role") != "user":
+        corte = len(self.mensajes) - limite
+        while corte < len(self.mensajes) and not self._es_turno_usuario(self.mensajes[corte]):
             corte += 1
-        self.mensajes = [self.mensajes[0]] + cuerpo[corte:]
+        if corte < len(self.mensajes):  # sin corte valido, mejor no recortar
+            self.mensajes = self.mensajes[corte:]
 
     def reiniciar(self) -> None:
-        self.mensajes = [{"role": "system", "content": sistema(self.usuario, self.rol)}]
+        self.mensajes = []
+        self.sdk_session_id = None

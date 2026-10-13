@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 
-from agent.llm import LLMError, OpenRouter
+from agent.llm import Claude, LLMError
 from agent.session import Sesion
 from settings import settings
 from tools import ejecutar, esquemas_para
@@ -11,7 +11,7 @@ from tools.base import Contexto
 
 
 class Agente:
-    def __init__(self, llm: OpenRouter, ctx: Contexto, sesion: Sesion,
+    def __init__(self, llm: Claude, ctx: Contexto, sesion: Sesion,
                  on_tool=None):
         self.llm = llm
         self.ctx = ctx
@@ -24,42 +24,43 @@ class Agente:
 
         for _ in range(settings.MAX_ITERACIONES):
             try:
-                datos = self.llm.chat(self.sesion.mensajes, herramientas)
+                resp = self.llm.chat(self.sesion.sistema, self.sesion.mensajes,
+                                     herramientas)
             except LLMError as exc:
                 return f"[error del modelo] {exc}"
 
-            mensaje = datos["choices"][0]["message"]
-            llamadas = mensaje.get("tool_calls") or []
+            if resp.stop_reason == "refusal":
+                return "No puedo ayudarte con esa consulta."
 
-            # El historial necesita el mensaje del asistente tal cual vino.
-            self.sesion.agregar(
-                {
-                    "role": "assistant",
-                    "content": mensaje.get("content") or "",
-                    **({"tool_calls": llamadas} if llamadas else {}),
-                }
-            )
+            # El contenido completo (thinking incluido) vuelve al historial tal
+            # cual: la API lo necesita para continuar despues de un tool_use.
+            self.sesion.agregar({"role": "assistant", "content": resp.content})
 
-            if not llamadas:
-                return (mensaje.get("content") or "").strip() or "(sin respuesta)"
+            llamadas = [b for b in resp.content if b.type == "tool_use"]
+            texto_resp = "".join(b.text for b in resp.content if b.type == "text").strip()
 
+            if resp.stop_reason == "max_tokens" and not llamadas:
+                return (texto_resp + "\n[respuesta cortada por max_tokens]").strip()
+            if resp.stop_reason != "tool_use" or not llamadas:
+                return texto_resp or "(sin respuesta)"
+
+            # Todos los resultados van en un solo mensaje 'user'.
+            resultados = []
             for llamada in llamadas:
-                nombre = llamada["function"]["name"]
-                try:
-                    args = json.loads(llamada["function"].get("arguments") or "{}")
-                except json.JSONDecodeError:
-                    args = {}
-                resultado = ejecutar(nombre, args, self.ctx)
+                args = llamada.input if isinstance(llamada.input, dict) else {}
+                resultado = ejecutar(llamada.name, args, self.ctx)
                 if self.on_tool:
-                    self.on_tool(nombre, args, resultado)
-                self.sesion.agregar(
+                    self.on_tool(llamada.name, args, resultado)
+                resultados.append(
                     {
-                        "role": "tool",
-                        "tool_call_id": llamada["id"],
-                        "name": nombre,
+                        "type": "tool_result",
+                        "tool_use_id": llamada.id,
                         "content": json.dumps(resultado, ensure_ascii=False, default=str),
+                        **({"is_error": True}
+                           if isinstance(resultado, dict) and "error" in resultado else {}),
                     }
                 )
+            self.sesion.agregar({"role": "user", "content": resultados})
 
         return (
             "Me enrede consultando el sistema y llegue al limite de pasos. "

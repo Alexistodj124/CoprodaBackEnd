@@ -7,10 +7,12 @@ referencia calculada aparte.
 ## Correrlo
 
     cd agente
-    python3 evaluacion/casos.py        # regenera los casos con los datos de hoy
-    python3 evaluacion/correr.py       # los pasa por el agente
+    source .venv/bin/activate          # ver README del agente
+    python evaluacion/casos.py         # regenera los casos con los datos de hoy
+    python evaluacion/correr.py        # los pasa por el agente (Opus 5)
+    python evaluacion/calificar.py     # primera calificación automática
 
-Para un tramo: `python3 evaluacion/correr.py --desde 1 --hasta 10`.
+Para un tramo: `python evaluacion/correr.py --desde 1 --hasta 10`.
 Guarda todo en `respuestas.json` después de cada caso, así que se puede cortar
 y retomar.
 
@@ -40,8 +42,6 @@ entregar un dato.
 
 ## Estado
 
-Pendiente de correr. La llave de OpenRouter está topada:
-
-    Key limit exceeded (total limit). $10.00 of $10.00 used; does not reset.
-
-Subir el límite en https://openrouter.ai/settings/keys y volver a lanzar.
+Corre con `claude-opus-5` usando la suscripción de Claude (Claude Agent SDK,
+`AGENTE_BACKEND=suscripcion`). Requiere `claude auth login` una vez. Cada caso
+guarda en `respuestas.json` qué modelo contestó (`modelos`).

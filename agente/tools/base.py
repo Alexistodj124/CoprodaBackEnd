@@ -35,12 +35,9 @@ class Herramienta:
 
     def esquema(self) -> dict:
         return {
-            "type": "function",
-            "function": {
-                "name": self.nombre,
-                "description": self.descripcion,
-                "parameters": self.parametros,
-            },
+            "name": self.nombre,
+            "description": self.descripcion,
+            "input_schema": self.parametros,
         }
 
 
