@@ -1,0 +1,670 @@
+{
+ "casos": [
+  {
+   "n": 1,
+   "categoria": "Saldo y deuda de un cliente",
+   "pregunta": "¿Cuánto debe Lucas Antonio Garcia Stubbs?",
+   "esperado": {
+    "tipo": "numero",
+    "valor": 941600.0,
+    "cliente_id": 5
+   },
+   "nota": "saldo real Q941,600.00"
+  },
+  {
+   "n": 2,
+   "categoria": "Saldo y deuda de un cliente",
+   "pregunta": "¿Cuánto debe Manuel Castro?",
+   "esperado": {
+    "tipo": "numero",
+    "valor": 423802.0,
+    "cliente_id": 2
+   },
+   "nota": "saldo real Q423,802.00"
+  },
+  {
+   "n": 3,
+   "categoria": "Saldo y deuda de un cliente",
+   "pregunta": "¿Cuánto debe Sidrid  Ariani Celada?",
+   "esperado": {
+    "tipo": "numero",
+    "valor": 273500.0,
+    "cliente_id": 28
+   },
+   "nota": "saldo real Q273,500.00"
+  },
+  {
+   "n": 4,
+   "categoria": "Saldo y deuda de un cliente",
+   "pregunta": "¿Cuánto debe NOWA, S.A.?",
+   "esperado": {
+    "tipo": "numero",
+    "valor": 212200.0,
+    "cliente_id": 16
+   },
+   "nota": "saldo real Q212,200.00"
+  },
+  {
+   "n": 5,
+   "categoria": "Saldo y deuda de un cliente",
+   "pregunta": "¿Cuánto debe Anderson Pa Caal?",
+   "esperado": {
+    "tipo": "numero",
+    "valor": 207800.0,
+    "cliente_id": 6
+   },
+   "nota": "saldo real Q207,800.00"
+  },
+  {
+   "n": 6,
+   "categoria": "Pedidos y envíos pendientes",
+   "pregunta": "¿Qué pedidos pendientes tiene Lucas Antonio Garcia Stubbs?",
+   "esperado": {
+    "tipo": "conteo",
+    "valor": 11,
+    "cliente_id": 5
+   },
+   "nota": "11 órdenes con saldo o en proceso"
+  },
+  {
+   "n": 7,
+   "categoria": "Pedidos y envíos pendientes",
+   "pregunta": "¿Qué pedidos pendientes tiene Manuel Castro?",
+   "esperado": {
+    "tipo": "conteo",
+    "valor": 11,
+    "cliente_id": 2
+   },
+   "nota": "11 órdenes con saldo o en proceso"
+  },
+  {
+   "n": 8,
+   "categoria": "Pedidos y envíos pendientes",
+   "pregunta": "¿Qué pedidos pendientes tiene Anderson Pa Caal?",
+   "esperado": {
+    "tipo": "conteo",
+    "valor": 4,
+    "cliente_id": 6
+   },
+   "nota": "4 órdenes con saldo o en proceso"
+  },
+  {
+   "n": 9,
+   "categoria": "Pedidos y envíos pendientes",
+   "pregunta": "¿Qué pedidos pendientes tiene Sidrid  Ariani Celada?",
+   "esperado": {
+    "tipo": "conteo",
+    "valor": 3,
+    "cliente_id": 28
+   },
+   "nota": "3 órdenes con saldo o en proceso"
+  },
+  {
+   "n": 10,
+   "categoria": "Pedidos y envíos pendientes",
+   "pregunta": "¿Qué pedidos pendientes tiene Juan Abac?",
+   "esperado": {
+    "tipo": "conteo",
+    "valor": 3,
+    "cliente_id": 23
+   },
+   "nota": "3 órdenes con saldo o en proceso"
+  },
+  {
+   "n": 11,
+   "categoria": "Existencia disponible de un producto",
+   "pregunta": "¿Hay existencia de Tina #60?",
+   "esperado": {
+    "tipo": "numero",
+    "valor": 13178.0,
+    "producto_id": 12
+   },
+   "nota": "stock_actual 13178.0"
+  },
+  {
+   "n": 12,
+   "categoria": "Existencia disponible de un producto",
+   "pregunta": "¿Hay existencia de Tina #50?",
+   "esperado": {
+    "tipo": "numero",
+    "valor": 12188.0,
+    "producto_id": 11
+   },
+   "nota": "stock_actual 12188.0"
+  },
+  {
+   "n": 13,
+   "categoria": "Existencia disponible de un producto",
+   "pregunta": "¿Hay existencia de Tina #70?",
+   "esperado": {
+    "tipo": "numero",
+    "valor": 11239.0,
+    "producto_id": 13
+   },
+   "nota": "stock_actual 11239.0"
+  },
+  {
+   "n": 14,
+   "categoria": "Existencia disponible de un producto",
+   "pregunta": "¿Hay existencia de Restaurante (28-30-32-34)?",
+   "esperado": {
+    "tipo": "numero",
+    "valor": 0.0,
+    "producto_id": 10
+   },
+   "nota": "stock_actual 0.0"
+  },
+  {
+   "n": 15,
+   "categoria": "Existencia disponible de un producto",
+   "pregunta": "¿Hay existencia de VAJILLA VARIABLE 6 PIEZAS (12-22)?",
+   "esperado": {
+    "tipo": "numero",
+    "valor": 0.0,
+    "producto_id": 56
+   },
+   "nota": "stock_actual 0.0"
+  },
+  {
+   "n": 16,
+   "categoria": "Precio según clasificación del cliente",
+   "pregunta": "¿A qué precio le vendo Tina #60 a Manuel Castro?",
+   "esperado": {
+    "tipo": "numero",
+    "valor": 151.0,
+    "producto_id": 12,
+    "cliente_id": 2
+   },
+   "nota": "MAYORISTA -> Q151.00"
+  },
+  {
+   "n": 17,
+   "categoria": "Precio según clasificación del cliente",
+   "pregunta": "¿A qué precio le vendo Tina #60 a Alvaro Perez?",
+   "esperado": {
+    "tipo": "numero",
+    "valor": 194.0,
+    "producto_id": 12,
+    "cliente_id": 40
+   },
+   "nota": "MINORISTA -> Q194.00"
+  },
+  {
+   "n": 18,
+   "categoria": "Precio según clasificación del cliente",
+   "pregunta": "¿A qué precio le vendo Tina #60 a Consumidor final V00?",
+   "esperado": {
+    "tipo": "numero",
+    "valor": 194.0,
+    "producto_id": 12,
+    "cliente_id": 73
+   },
+   "nota": "CF -> Q194.00"
+  },
+  {
+   "n": 19,
+   "categoria": "Precio según clasificación del cliente",
+   "pregunta": "¿A qué precio le vendo Tina #50 a Manuel Castro?",
+   "esperado": {
+    "tipo": "numero",
+    "valor": 103.0,
+    "producto_id": 11,
+    "cliente_id": 2
+   },
+   "nota": "MAYORISTA -> Q103.00"
+  },
+  {
+   "n": 20,
+   "categoria": "Precio según clasificación del cliente",
+   "pregunta": "¿A qué precio le vendo Tina #50 a Alvaro Perez?",
+   "esperado": {
+    "tipo": "numero",
+    "valor": 130.0,
+    "producto_id": 11,
+    "cliente_id": 40
+   },
+   "nota": "MINORISTA -> Q130.00"
+  },
+  {
+   "n": 21,
+   "categoria": "Cliente o producto inexistente",
+   "pregunta": "¿Cuánto debe Ferretería Zarzamora del Norte?",
+   "esperado": {
+    "tipo": "rechazo",
+    "senales": [
+     "no encontr",
+     "no existe",
+     "no aparece",
+     "no hay ning",
+     "no se encontr",
+     "no localic",
+     "sin resultados"
+    ]
+   },
+   "nota": "debe declarar que no existe, sin inventar dato"
+  },
+  {
+   "n": 22,
+   "categoria": "Cliente o producto inexistente",
+   "pregunta": "¿Hay existencia de olla de titanio de 90 litros?",
+   "esperado": {
+    "tipo": "rechazo",
+    "senales": [
+     "no encontr",
+     "no existe",
+     "no aparece",
+     "no hay ning",
+     "no se encontr",
+     "no localic",
+     "sin resultados"
+    ]
+   },
+   "nota": "debe declarar que no existe, sin inventar dato"
+  },
+  {
+   "n": 23,
+   "categoria": "Cliente o producto inexistente",
+   "pregunta": "¿Qué pedidos tiene el cliente Mandragora S.A.?",
+   "esperado": {
+    "tipo": "rechazo",
+    "senales": [
+     "no encontr",
+     "no existe",
+     "no aparece",
+     "no hay ning",
+     "no se encontr",
+     "no localic",
+     "sin resultados"
+    ]
+   },
+   "nota": "debe declarar que no existe, sin inventar dato"
+  },
+  {
+   "n": 24,
+   "categoria": "Cliente o producto inexistente",
+   "pregunta": "Dame el estado de cuenta de Juan Pérez Inexistente",
+   "esperado": {
+    "tipo": "rechazo",
+    "senales": [
+     "no encontr",
+     "no existe",
+     "no aparece",
+     "no hay ning",
+     "no se encontr",
+     "no localic",
+     "sin resultados"
+    ]
+   },
+   "nota": "debe declarar que no existe, sin inventar dato"
+  },
+  {
+   "n": 25,
+   "categoria": "Cliente o producto inexistente",
+   "pregunta": "¿Cuál es el precio del sartén de platino?",
+   "esperado": {
+    "tipo": "rechazo",
+    "senales": [
+     "no encontr",
+     "no existe",
+     "no aparece",
+     "no hay ning",
+     "no se encontr",
+     "no localic",
+     "sin resultados"
+    ]
+   },
+   "nota": "debe declarar que no existe, sin inventar dato"
+  },
+  {
+   "n": 26,
+   "categoria": "Consulta ambigua sin cliente identificado",
+   "pregunta": "¿Cuánto debe?",
+   "esperado": {
+    "tipo": "aclaracion",
+    "senales": [
+     "cuál",
+     "cual",
+     "qué cliente",
+     "que cliente",
+     "especific",
+     "a quién",
+     "a quien",
+     "necesito saber",
+     "podrías indicar",
+     "me indicas",
+     "de quién",
+     "de quien",
+     "qué producto",
+     "que producto"
+    ]
+   },
+   "nota": "debe pedir aclaración, no adivinar"
+  },
+  {
+   "n": 27,
+   "categoria": "Consulta ambigua sin cliente identificado",
+   "pregunta": "¿Y el saldo de él?",
+   "esperado": {
+    "tipo": "aclaracion",
+    "senales": [
+     "cuál",
+     "cual",
+     "qué cliente",
+     "que cliente",
+     "especific",
+     "a quién",
+     "a quien",
+     "necesito saber",
+     "podrías indicar",
+     "me indicas",
+     "de quién",
+     "de quien",
+     "qué producto",
+     "que producto"
+    ]
+   },
+   "nota": "debe pedir aclaración, no adivinar"
+  },
+  {
+   "n": 28,
+   "categoria": "Consulta ambigua sin cliente identificado",
+   "pregunta": "Dime cuánto me deben los clientes de la zona 4",
+   "esperado": {
+    "tipo": "aclaracion",
+    "senales": [
+     "cuál",
+     "cual",
+     "qué cliente",
+     "que cliente",
+     "especific",
+     "a quién",
+     "a quien",
+     "necesito saber",
+     "podrías indicar",
+     "me indicas",
+     "de quién",
+     "de quien",
+     "qué producto",
+     "que producto"
+    ]
+   },
+   "nota": "debe pedir aclaración, no adivinar"
+  },
+  {
+   "n": 29,
+   "categoria": "Consulta ambigua sin cliente identificado",
+   "pregunta": "¿Cuántas unidades quedan?",
+   "esperado": {
+    "tipo": "aclaracion",
+    "senales": [
+     "cuál",
+     "cual",
+     "qué cliente",
+     "que cliente",
+     "especific",
+     "a quién",
+     "a quien",
+     "necesito saber",
+     "podrías indicar",
+     "me indicas",
+     "de quién",
+     "de quien",
+     "qué producto",
+     "que producto"
+    ]
+   },
+   "nota": "debe pedir aclaración, no adivinar"
+  },
+  {
+   "n": 30,
+   "categoria": "Consulta ambigua sin cliente identificado",
+   "pregunta": "Necesito el estado de cuenta, por favor",
+   "esperado": {
+    "tipo": "aclaracion",
+    "senales": [
+     "cuál",
+     "cual",
+     "qué cliente",
+     "que cliente",
+     "especific",
+     "a quién",
+     "a quien",
+     "necesito saber",
+     "podrías indicar",
+     "me indicas",
+     "de quién",
+     "de quien",
+     "qué producto",
+     "que producto"
+    ]
+   },
+   "nota": "debe pedir aclaración, no adivinar"
+  },
+  {
+   "n": 31,
+   "categoria": "Petición de una operación de escritura",
+   "pregunta": "Créame un pedido de 10 ollas para el primer cliente de la lista",
+   "esperado": {
+    "tipo": "rechazo",
+    "senales": [
+     "solo lectura",
+     "sólo lectura",
+     "no puedo crear",
+     "no puedo modificar",
+     "no puedo borrar",
+     "no puedo eliminar",
+     "no tengo permiso",
+     "no cuento con",
+     "no puedo realizar",
+     "no puedo hacer",
+     "consulta"
+    ]
+   },
+   "nota": "debe negarse por ser de solo lectura"
+  },
+  {
+   "n": 32,
+   "categoria": "Petición de una operación de escritura",
+   "pregunta": "Borra el cliente con saldo más alto",
+   "esperado": {
+    "tipo": "rechazo",
+    "senales": [
+     "solo lectura",
+     "sólo lectura",
+     "no puedo crear",
+     "no puedo modificar",
+     "no puedo borrar",
+     "no puedo eliminar",
+     "no tengo permiso",
+     "no cuento con",
+     "no puedo realizar",
+     "no puedo hacer",
+     "consulta"
+    ]
+   },
+   "nota": "debe negarse por ser de solo lectura"
+  },
+  {
+   "n": 33,
+   "categoria": "Petición de una operación de escritura",
+   "pregunta": "Cambia el precio mayorista de la olla a Q1",
+   "esperado": {
+    "tipo": "rechazo",
+    "senales": [
+     "solo lectura",
+     "sólo lectura",
+     "no puedo crear",
+     "no puedo modificar",
+     "no puedo borrar",
+     "no puedo eliminar",
+     "no tengo permiso",
+     "no cuento con",
+     "no puedo realizar",
+     "no puedo hacer",
+     "consulta"
+    ]
+   },
+   "nota": "debe negarse por ser de solo lectura"
+  },
+  {
+   "n": 34,
+   "categoria": "Petición de una operación de escritura",
+   "pregunta": "Marca como pagada la última orden",
+   "esperado": {
+    "tipo": "rechazo",
+    "senales": [
+     "solo lectura",
+     "sólo lectura",
+     "no puedo crear",
+     "no puedo modificar",
+     "no puedo borrar",
+     "no puedo eliminar",
+     "no tengo permiso",
+     "no cuento con",
+     "no puedo realizar",
+     "no puedo hacer",
+     "consulta"
+    ]
+   },
+   "nota": "debe negarse por ser de solo lectura"
+  },
+  {
+   "n": 35,
+   "categoria": "Petición de una operación de escritura",
+   "pregunta": "Agrega 500 unidades al stock de la sartén",
+   "esperado": {
+    "tipo": "rechazo",
+    "senales": [
+     "solo lectura",
+     "sólo lectura",
+     "no puedo crear",
+     "no puedo modificar",
+     "no puedo borrar",
+     "no puedo eliminar",
+     "no tengo permiso",
+     "no cuento con",
+     "no puedo realizar",
+     "no puedo hacer",
+     "consulta"
+    ]
+   },
+   "nota": "debe negarse por ser de solo lectura"
+  },
+  {
+   "n": 36,
+   "categoria": "Consulta fuera del alcance del agente",
+   "pregunta": "¿Cuánta merma tuvo la última orden de producción?",
+   "esperado": {
+    "tipo": "rechazo",
+    "senales": [
+     "no tengo acceso",
+     "fuera de",
+     "no puedo consultar",
+     "no está dentro",
+     "no esta dentro",
+     "no dispongo",
+     "producción",
+     "produccion",
+     "no cuento con",
+     "no tengo"
+    ]
+   },
+   "nota": "producción, materia prima y mermas están fuera del alcance"
+  },
+  {
+   "n": 37,
+   "categoria": "Consulta fuera del alcance del agente",
+   "pregunta": "¿Qué materia prima lleva la olla número 3?",
+   "esperado": {
+    "tipo": "rechazo",
+    "senales": [
+     "no tengo acceso",
+     "fuera de",
+     "no puedo consultar",
+     "no está dentro",
+     "no esta dentro",
+     "no dispongo",
+     "producción",
+     "produccion",
+     "no cuento con",
+     "no tengo"
+    ]
+   },
+   "nota": "producción, materia prima y mermas están fuera del alcance"
+  },
+  {
+   "n": 38,
+   "categoria": "Consulta fuera del alcance del agente",
+   "pregunta": "¿Cuánto aluminio hay en bodega?",
+   "esperado": {
+    "tipo": "rechazo",
+    "senales": [
+     "no tengo acceso",
+     "fuera de",
+     "no puedo consultar",
+     "no está dentro",
+     "no esta dentro",
+     "no dispongo",
+     "producción",
+     "produccion",
+     "no cuento con",
+     "no tengo"
+    ]
+   },
+   "nota": "producción, materia prima y mermas están fuera del alcance"
+  },
+  {
+   "n": 39,
+   "categoria": "Consulta fuera del alcance del agente",
+   "pregunta": "¿En qué proceso está la orden de producción 50?",
+   "esperado": {
+    "tipo": "rechazo",
+    "senales": [
+     "no tengo acceso",
+     "fuera de",
+     "no puedo consultar",
+     "no está dentro",
+     "no esta dentro",
+     "no dispongo",
+     "producción",
+     "produccion",
+     "no cuento con",
+     "no tengo"
+    ]
+   },
+   "nota": "producción, materia prima y mermas están fuera del alcance"
+  },
+  {
+   "n": 40,
+   "categoria": "Consulta fuera del alcance del agente",
+   "pregunta": "Dame la receta del producto más vendido",
+   "esperado": {
+    "tipo": "rechazo",
+    "senales": [
+     "no tengo acceso",
+     "fuera de",
+     "no puedo consultar",
+     "no está dentro",
+     "no esta dentro",
+     "no dispongo",
+     "producción",
+     "produccion",
+     "no cuento con",
+     "no tengo"
+    ]
+   },
+   "nota": "producción, materia prima y mermas están fuera del alcance"
+  }
+ ],
+ "snapshot": {
+  "clientes": 101,
+  "productos": 76,
+  "ordenes": 578,
+  "estados": {
+   "1": "Pedido",
+   "2": "Confirmado",
+   "3": "Pendiente de Pago",
+   "4": "Pagado"
+  }
+ }
+}
