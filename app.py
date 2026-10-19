@@ -2098,6 +2098,11 @@ def create_app():
         restante = total_teorico - total_real
         return restante if restante > 0 else Decimal("0")
 
+    def _cantidad(valor) -> Decimal:
+        # Misma precisión que las columnas Numeric(12, 4), para que los floats
+        # del navegador (p. ej. 0.30000000000000004) no rompan las comparaciones.
+        return Decimal(str(valor or 0)).quantize(Decimal("0.0001"))
+
     def _cantidad_base_proceso(proceso_orden: ProcesoOrden, orden: OrdenProduccion):
         if proceso_orden.cantidad_salida is not None:
             return Decimal(str(proceso_orden.cantidad_salida))
@@ -3237,6 +3242,30 @@ def create_app():
                 400,
             )
 
+        entrada = _cantidad(proceso_orden.cantidad_entrada)
+        movido = _cantidad(proceso_orden.cantidad_salida) + _cantidad(
+            proceso_orden.cantidad_perdida
+        )
+        if movido > entrada:
+            db.session.rollback()
+            return (
+                jsonify({"error": "salida + pérdida supera la entrada del proceso"}),
+                400,
+            )
+        # Completar es definitivo: solo si el proceso recibió algo, lo procesó
+        # todo y el anterior ya terminó (si no, le seguirán llegando piezas).
+        if not parcial:
+            error = None
+            if entrada <= 0:
+                error = "No se puede completar un proceso sin cantidad de entrada"
+            elif movido < entrada:
+                error = "No se puede completar: salida + pérdida no cubre la entrada"
+            elif previo and previo.estado != "COMPLETADO":
+                error = "No se puede completar: el proceso anterior no está completado"
+            if error:
+                db.session.rollback()
+                return jsonify({"error": error}), 400
+
         if "motivo_perdida" in data:
             proceso_orden.motivo_perdida = (
                 (data.get("motivo_perdida") or "").strip() or None
@@ -3360,9 +3389,11 @@ def create_app():
         No inicia ni completa procesos, no registra consumos y no toca
         stock ni reservas: solo ajusta entrada/salida/pérdida manteniendo
         la cadena (la entrada de cada proceso = salida del anterior) y
-        re-deriva estados: un COMPLETADO que deja de estar lleno se reabre
-        a EN_PROCESO (al recompletarlo por el flujo normal, los consumos
-        automáticos no se duplican porque ese registro es idempotente).
+        re-deriva estados: un COMPLETADO que deja de estar lleno, que se
+        queda sin entrada o cuyo proceso anterior deja de estar completo se
+        reabre a EN_PROCESO, en cascada (al recompletarlo por el flujo normal,
+        los consumos automáticos no se duplican porque ese registro es
+        idempotente).
         Los procesos PENDIENTE no se editan: sus cantidades se fijan al
         iniciarlos por el flujo normal.
         """
@@ -3439,6 +3470,7 @@ def create_app():
         # Recalcular la cadena sobre los procesos ya iniciados. Se corta en
         # el primer PENDIENTE (la cola de la orden) sin tocarlo.
         entrada_encadenada = None
+        anterior_completado = True
         for proceso in procesos:
             if proceso.estado == "PENDIENTE":
                 break
@@ -3470,9 +3502,13 @@ def create_app():
             proceso.cantidad_entrada = entrada
             proceso.cantidad_salida = salida
             proceso.cantidad_perdida = perdida
-            if proceso.estado == "COMPLETADO" and salida < entrada - perdida:
+            # Con entrada 0, "salida < entrada - perdida" es 0 < 0 y el proceso
+            # quedaba COMPLETADO sin haber recibido nada: trabado para siempre.
+            lleno = entrada > 0 and salida + perdida >= entrada
+            if proceso.estado == "COMPLETADO" and not (lleno and anterior_completado):
                 proceso.estado = "EN_PROCESO"
                 proceso.fin = None
+            anterior_completado = proceso.estado == "COMPLETADO"
             entrada_encadenada = salida
 
         db.session.commit()
